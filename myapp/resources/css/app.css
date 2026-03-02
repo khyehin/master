@@ -1,0 +1,652 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Date range picker ===== */
+.date-filter-wrapper {
+  position: relative;
+  max-width: 260px;
+}
+
+.drp-display-input {
+  cursor: pointer;
+  background-color: #ffffff;
+}
+
+.drp-container {
+  position: fixed;
+  z-index: 99999;
+  background: transparent;
+  padding: 0;
+  display: none;
+  min-width: 408px;
+  overflow: visible;
+  max-height: none;
+}
+
+.drp-container.drp-container-open {
+  display: flex !important;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: stretch;
+  overflow: visible;
+  max-height: none;
+}
+
+/* 左侧：日历面板 - 独立白底圆角+阴影 */
+.drp-wrapper {
+  width: 260px;
+  min-width: 260px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+}
+
+.drp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.drp-month-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.drp-nav {
+  border: none;
+  background: #f3f4f6;
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drp-nav:hover {
+  background: #e5e7eb;
+}
+
+.drp-week-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 2px;
+  font-size: 10px;
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 4px;
+  width: 100%;
+}
+
+.drp-week-row > div,
+.drp-week-row > span.drp-week-cell {
+  flex: 0 0 calc((100% - 12px) / 7);
+  width: calc((100% - 12px) / 7);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+.drp-week-row .drp-week-cell {
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.drp-grid {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  grid-auto-flow: row !important;
+  gap: 2px;
+  font-size: 11px;
+  width: 100%;
+  min-width: 0;
+}
+
+.drp-grid > div {
+  padding: 4px 0;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.drp-grid > div.is-empty {
+  cursor: default;
+}
+
+.drp-grid > div:not(.is-empty):hover {
+  background: #e5e7eb;
+}
+
+.drp-grid > div.is-start,
+.drp-grid > div.is-end {
+  background: #3b82f6;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.drp-grid > div.is-in-range {
+  background: #93c5fd;
+  color: #1e3a8a;
+}
+
+/* 右侧：快捷选项面板 - 独立白底圆角+阴影 */
+.drp-quick-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 120px;
+  min-width: 120px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+}
+
+.drp-quick-item {
+  border: none;
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  color: #374151;
+  transition: background 0.15s ease;
+}
+
+.drp-quick-item:hover {
+  background: #e5e7eb;
+}
+
+@media (max-width: 380px) {
+  .drp-container.drp-container-open {
+    flex-direction: column;
+    max-width: 310px;
+    min-width: auto;
+  }
+
+  .drp-wrapper {
+    width: 100%;
+  }
+
+  .drp-quick-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .drp-quick-item {
+    flex: 1 0 calc(50% - 6px);
+    text-align: center;
+  }
+}
+
+/* ===== User edit page – 设计好看一点 ===== */
+.user-edit-page .user-edit-alert {
+  margin-bottom: 1.25rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+}
+
+.user-edit-alert--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.user-edit-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.user-edit-header-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.user-edit-title {
+  margin-top: 0.375rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.user-edit-subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.user-edit-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.75rem 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* 全部在下面填：label 在上，input 在下，区分明显 */
+.user-form-field {
+  margin-bottom: 1.25rem;
+}
+
+.user-form-field .user-form-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  margin-bottom: 0.5rem;
+}
+
+.user-form-field .user-form-input {
+  display: block;
+  width: 100%;
+  height: 2.5rem;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.user-form-field--checkbox {
+  margin-bottom: 1rem;
+}
+
+.user-form-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  margin-bottom: 0.5rem;
+}
+
+.user-form-input {
+  width: 100%;
+  height: 2.5rem;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.user-form-input:focus {
+  border-color: #6b7280;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.2);
+}
+
+.user-form-error {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: #dc2626;
+}
+
+.user-form-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.user-form-checkbox-wrap--mb {
+  margin-bottom: 0.5rem;
+}
+
+/* Roles / Company access 分更好：独立块 */
+.user-form-block {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.user-form-block + .user-form-block {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+}
+
+.user-form-block-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.75rem 0;
+}
+
+.user-form-block-desc {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+
+.user-form-block-desc--sm {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.user-form-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.user-form-companies {
+  max-height: 10rem;
+  overflow-y: auto;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.user-form-actions-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* 方框按钮 */
+.user-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6rem;
+  height: 2.5rem;
+  padding: 0 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1px solid #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  box-sizing: border-box;
+}
+
+.user-btn--primary {
+  background: #374151;
+  color: #fff;
+  border-color: #374151;
+}
+
+.user-btn--primary:hover {
+  background: #1f2937;
+  border-color: #1f2937;
+  color: #fff;
+}
+
+.user-btn--secondary {
+  background: #fff;
+  color: #374151;
+  border-color: #374151;
+}
+
+.user-btn--secondary:hover {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #1f2937;
+}
+
+/* User list page – New User 格子明显 + 表格线清楚 + 字在格子中间 */
+.user-list-page .user-list-header {
+  margin-bottom: 2rem;
+}
+
+.user-new-cell {
+  display: inline-block;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.user-new-link {
+  font-size: 0.875rem;
+  color: #374151;
+  text-decoration: none;
+}
+
+.user-new-link:hover {
+  color: #111827;
+}
+
+.user-list-table {
+  border-collapse: collapse;
+  border: 2px solid #374151;
+  font-size: 1rem;
+}
+
+.user-list-table .user-th {
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  background: #e5e7eb;
+  border: 1px solid #374151;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.user-list-table .user-row {
+  background: #fff;
+}
+
+.user-list-table .user-row:hover {
+  background: #f9fafb;
+}
+
+.user-list-table .user-td {
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  border: 1px solid #374151;
+  color: #111827;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.user-edit-link {
+  display: inline-block;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #374151;
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.user-edit-link:hover {
+  color: #111827;
+  background: #e5e7eb;
+}
+
+.user-list-table .user-td.text-gray-600 {
+  font-size: 0.9375rem;
+}
+
+.user-list-table .user-td .text-xs {
+  font-size: 0.9375rem;
+}
+
+.user-row--empty .user-td-empty {
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  vertical-align: middle;
+  color: #6b7280;
+  font-size: 1rem;
+  border: 1px solid #374151;
+}
+
+/* Companies list page – 与 report 页 Transactions 同款：eyebrow + 主标题 */
+.companies-list-page {
+  font-family: inherit;
+}
+/* 小标签（与 report 的 “Transactions” 同款：text-xs font-semibold uppercase tracking-wider text-gray-500） */
+.companies-list-page .companies-list-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
+}
+/* 主标题（与 report 的 h1 同款：text-lg font-semibold text-gray-900 mt-1） */
+.companies-list-page .companies-list-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0.25rem 0 0 0;
+  line-height: 1.3;
+}
+.companies-list-page .companies-list-msg {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+.companies-list-page .companies-list-msg--success { color: #166534; }
+.companies-list-page .companies-list-msg--error { color: #b91c1c; }
+.companies-list-page .companies-list-btn {
+  font-size: 0.875rem;
+  font-weight: 600;
+  height: 2.25rem;
+  padding: 0 1rem;
+  min-width: auto;
+  border-radius: 6px;
+}
+.companies-list-page .companies-list-table {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+/* 表头：与 report “Transactions” 同款（重点字） */
+.companies-list-page .user-list-table .user-th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.companies-list-page .user-list-table .user-td {
+  font-size: 0.875rem;
+  color: #374151;
+  padding: 0.625rem 1rem;
+  vertical-align: middle;
+}
+/* 公司名（重点字）：与 report 主标题同款 font-semibold text-gray-900 */
+.companies-list-page .user-list-table .user-td:first-child {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+.companies-list-page .user-list-table .user-td-empty {
+  font-size: 0.875rem;
+  color: #6b7280;
+  padding: 1.5rem 1rem;
+}
+.companies-list-page .user-list-table .user-td-empty a {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* List page actions dropdown – 与 lang-dropdown 统一，按钮只显示 ⋯ */
+.user-actions-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.user-actions-trigger {
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  font-size: 1rem;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.user-actions-trigger:hover {
+  background: #f3f4f6;
+}
+.user-actions-trigger span {
+  letter-spacing: 2px;
+}
+/* 下拉：跳出来的 box，项 hover 时变浅高亮 */
+.user-actions-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  min-width: 11rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15), 0 6px 12px rgba(0, 0, 0, 0.08);
+  padding: 6px 0;
+  z-index: 50;
+  transform-origin: top right;
+}
+.user-actions-dropdown a {
+  display: block;
+  padding: 8px 14px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #374151;
+  text-decoration: none;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.user-actions-dropdown a:hover {
+  background: #e5e7eb;
+}
+.user-actions-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+.user-actions-delete-form {
+  padding: 0;
+  margin: 0;
+}
+.user-actions-dropdown .user-actions-item--danger {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #b91c1c;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.user-actions-dropdown .user-actions-item--danger:hover {
+  background: #fee2e2;
+}
