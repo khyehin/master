@@ -13,9 +13,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::redirect('/', '/login');
 
 Route::get('/locale/{locale}', function (string $locale) {
     if (! in_array($locale, ['en', 'zh', 'ms'], true)) {

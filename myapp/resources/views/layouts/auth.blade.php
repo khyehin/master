@@ -76,8 +76,10 @@
 
         <div class="w-full lg:flex-1 flex items-center justify-center mx-auto">
             <div class="login-box">
-                <div class="flex justify-center mb-4 min-h-[80px]">
-                    <img src="{{ asset('images/master-logo.png') }}" alt="Master" class="max-w-[220px] w-full h-auto object-contain" loading="eager">
+                <div class="flex justify-center mb-4 min-h-[90px] items-center">
+                    <span class="font-semibold tracking-[0.35em] text-slate-700 uppercase" style="font-size:45px;">
+                        Welcome
+                    </span>
                 </div>
                 <h2 class="text-center text-slate-600 text-lg mb-5">{{ __('Login') }}</h2>
                 @if(session('status'))

@@ -3,6 +3,28 @@
         {{ __('Dashboard') }}
     </x-slot>
 
+    <style>
+        .dashboard-pies-row {
+            display: flex;
+            flex-wrap: wrap;
+            margin-left: -0.5rem;
+            margin-right: -0.5rem;
+        }
+        .dashboard-pie {
+            width: 100%;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+        }
+        @media (min-width: 768px) {
+            .dashboard-pie { width: 50%; }
+        }
+        @media (min-width: 1024px) {
+            .dashboard-pie { width: 33.333333%; }
+        }
+    </style>
+
     <div class="max-w-7xl mx-auto w-full space-y-6">
         @if ($companies->isEmpty())
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
@@ -21,12 +43,25 @@
                 </p>
             </div>
 
-            {{-- Cashflow: Pie Deposit vs Withdraw (5cm) --}}
+            {{-- Cashflow: Pie Deposit vs Withdraw (最近 3 个月，每个月一个饼图) --}}
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
-                <h2 class="text-sm font-semibold text-gray-800 mb-2">{{ __('Cashflow') }}: {{ __('Deposit') }} vs {{ __('Withdraw') }} ({{ $baseCurrency }})</h2>
-                <div class="mx-auto flex justify-center" style="width: 5cm; height: 5cm;">
-                    <canvas id="chartCashflowPie"></canvas>
-                </div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-2">
+                    {{ __('Cashflow') }}: {{ __('Deposit') }} vs {{ __('Withdraw') }} ({{ $baseCurrency }}) – Last 3 months
+                </h2>
+                @if(!empty($pieLast3))
+                    <div class="dashboard-pies-row">
+                        @foreach($pieLast3 as $idx => $cell)
+                            <div class="dashboard-pie flex flex-col items-center">
+                                <div class="text-xs text-gray-600 mb-1 text-center w-full">{{ $cell['label'] }}</div>
+                                <div class="mx-auto flex justify-center" style="width: 5cm; height: 5cm;">
+                                    <canvas id="chartCashflowPie{{ $idx }}"></canvas>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-sm text-gray-500">{{ __('No cashflow entries.') }}</p>
+                @endif
             </div>
 
             {{-- Cashflow: Horizontal bar – remaining columns (Affin, XE, USDT) --}}
@@ -72,6 +107,7 @@
             const part1Last6Series = @json($part1Last6Series ?? []);
             const part2Labels = @json($part2Labels ?? []);
             const part2Series = @json($part2Series ?? []);
+            const pieLast3 = @json($pieLast3 ?? []);
 
             function toAmount(minor) { return Math.round(Number(minor)) / 100; }
 
@@ -83,37 +119,40 @@
                     return;
                 }
                 try {
-                    var pieCtx = document.getElementById('chartCashflowPie');
-                    if (pieCtx) {
-                        new Chart(pieCtx, {
-                            type: 'pie',
-                            data: {
-                                labels: pieLabels,
-                                datasets: [{
-                                    data: [toAmount(depositMinor), toAmount(withdrawalMinor)],
-                                    backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(239, 68, 68, 0.8)'],
-                                    borderColor: ['rgb(16, 185, 129)', 'rgb(239, 68, 68)'],
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: { position: 'bottom' },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: function(ctx) {
-                                                var v = ctx.raw;
-                                                return ctx.label + ': ' + baseCurrency + ' ' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    if (Array.isArray(pieLast3) && pieLast3.length) {
+                        pieLast3.forEach(function(item, idx) {
+                            var pieCtx = document.getElementById('chartCashflowPie' + idx);
+                            if (!pieCtx) return;
+                            new Chart(pieCtx, {
+                                type: 'pie',
+                                data: {
+                                    labels: pieLabels,
+                                    datasets: [{
+                                        data: [toAmount(item.deposit_minor || 0), toAmount(item.withdrawal_minor || 0)],
+                                        backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(239, 68, 68, 0.8)'],
+                                        borderColor: ['rgb(16, 185, 129)', 'rgb(239, 68, 68)'],
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { position: 'bottom' },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(ctx) {
+                                                    var v = ctx.raw;
+                                                    return ctx.label + ': ' + baseCurrency + ' ' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
+                            });
                         });
                     }
-                } catch (e) { console.error('Dashboard pie chart:', e); }
+                } catch (e) { console.error('Dashboard pie charts (last 3 months):', e); }
 
                 try {
                     var colLabels = Object.keys(columnTotals);
@@ -196,7 +235,10 @@
                                 },
                                 scales: {
                                     y: { stacked: true, beginAtZero: true, ticks: { callback: function(v) { return v.toLocaleString(); } } },
-                                    x: { stacked: true }
+                                    x: {
+                                        stacked: true,
+                                        ticks: { autoSkip: false }
+                                    }
                                 }
                             }
                         });
@@ -230,7 +272,8 @@
                                     tooltip: { mode: 'index', intersect: false }
                                 },
                                 scales: {
-                                    y: { beginAtZero: true, ticks: { callback: function(v) { return v.toLocaleString(); } } }
+                                    y: { beginAtZero: true, ticks: { callback: function(v) { return v.toLocaleString(); } } },
+                                    x: { ticks: { autoSkip: false } }
                                 }
                             }
                         });

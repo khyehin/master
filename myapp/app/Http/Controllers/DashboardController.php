@@ -42,6 +42,7 @@ class DashboardController extends Controller
                 ->get(['id', 'name', 'code', 'base_currency']);
         }
 
+        // Cashflow 相关：以今天为基准，最近 12 个月
         $end = Carbon::today()->endOfMonth();
         $start = Carbon::today()->subMonths(11)->startOfMonth();
 
@@ -50,6 +51,7 @@ class DashboardController extends Controller
         $depositTotalMinor = 0;
         $withdrawalTotalMinor = 0;
         $columnTotals = ['Affin' => 0, 'XE USDT' => 0, 'Total' => 0];
+        $pieLast3 = [];
 
         if ($companyIds !== []) {
             $baseQuery = CashflowEntry::query()
@@ -109,20 +111,66 @@ class DashboardController extends Controller
             $depositTotalMinor = (int) ($dw->d ?? 0);
             $withdrawalTotalMinor = (int) ($dw->w ?? 0);
 
-            $cols = CashflowEntry::query()
+            $dwByMonthRows = CashflowEntry::query()
                 ->whereBetween('entry_date', [$start, $end])
+                ->where(function ($q) use ($companyIds) {
+                    $q->whereIn('company_id', $companyIds)->orWhereNull('company_id');
+                })
+                ->select(
+                    DB::raw('YEAR(entry_date) as y'),
+                    DB::raw('MONTH(entry_date) as m'),
+                    DB::raw('COALESCE(SUM(deposit_minor), 0) as d'),
+                    DB::raw('COALESCE(SUM(withdrawal_minor), 0) as w')
+                )
+                ->groupBy('y', 'm')
+                ->orderBy('y')
+                ->orderBy('m')
+                ->get();
+            $dwByMonth = [];
+            foreach ($dwByMonthRows as $row) {
+                $key = sprintf('%04d-%02d', (int) $row->y, (int) $row->m);
+                $dwByMonth[$key] = [
+                    'deposit_minor' => (int) ($row->d ?? 0),
+                    'withdrawal_minor' => (int) ($row->w ?? 0),
+                ];
+            }
+
+            // Columns 图：显示「目前余额」，不限制时间区间
+            $cols = CashflowEntry::query()
                 ->where(function ($q) use ($companyIds) {
                     $q->whereIn('company_id', $companyIds)->orWhereNull('company_id');
                 })
                 ->select(
                     DB::raw('COALESCE(SUM(affin_minor), 0) as affin'),
                     DB::raw('COALESCE(SUM(xe_minor), 0) as xe'),
-                    DB::raw('COALESCE(SUM(usdt_minor), 0) as usdt')
+                    DB::raw('COALESCE(SUM(usdt_minor), 0) as usdt'),
+                    DB::raw('COALESCE(SUM(base_amount_minor), 0) as total_balance')
                 )
                 ->first();
             $columnTotals['Affin'] = (int) ($cols->affin ?? 0);
             $columnTotals['XE USDT'] = (int) ($cols->xe ?? 0) + (int) ($cols->usdt ?? 0);
-            $columnTotals['Total'] = array_sum($monthlyTotals);
+            $columnTotals['Total'] = (int) ($cols->total_balance ?? 0);
+
+            // Pie 图：最近 3 个月的 Deposit vs Withdraw（按时间顺序），用纯数字计算月份避免 Carbon 复制异常
+            $now = Carbon::today();
+            $curYear = (int) $now->format('Y');
+            $curMonth = (int) $now->format('n');
+            for ($offset = 2; $offset >= 0; $offset--) {
+                $m = $curMonth - $offset;
+                $y = $curYear;
+                while ($m <= 0) {
+                    $m += 12;
+                    $y--;
+                }
+                $d = Carbon::create($y, $m, 1)->endOfMonth();
+                $key = $d->format('Y-m');
+                $agg = $dwByMonth[$key] ?? ['deposit_minor' => 0, 'withdrawal_minor' => 0];
+                $pieLast3[] = [
+                    'label' => $d->format('M Y'),
+                    'deposit_minor' => $agg['deposit_minor'],
+                    'withdrawal_minor' => $agg['withdrawal_minor'],
+                ];
+            }
         }
 
         $labels = [];
@@ -151,26 +199,32 @@ class DashboardController extends Controller
 
         $baseCurrency = $companies->first()?->base_currency ?? 'MYR';
 
-        $currentYear = (int) date('Y');
-        $reportYear = $companyIds !== []
-            ? (int) (CompanyReportRow::whereIn('company_id', $companyIds)->max('year') ?? $currentYear)
-            : $currentYear;
-
+        // ==== 底部两个图：最新 6 个月（按今天往回算） ====
         $monthKeys = CompanyReportRow::monthKeys();
-        $end = Carbon::today()->endOfMonth();
         $last6Months = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $d = $end->copy()->subMonths($i);
+        $now = Carbon::today();
+        $curYear = (int) $now->format('Y');
+        $curMonth = (int) $now->format('n');
+        // 最新 6 个月：例如当前 3 月则为 前 5 个月到当前月（10,11,12,1,2,3）
+        for ($offset = 5; $offset >= 0; $offset--) {
+            $m = $curMonth - $offset;
+            $y = $curYear;
+            while ($m <= 0) {
+                $m += 12;
+                $y--;
+            }
+            $d = Carbon::create($y, $m, 1);
             $last6Months[] = [
-                'year' => (int) $d->format('Y'),
-                'month' => (int) $d->format('n'),
+                'year' => $y,
+                'month' => $m,
                 'label' => $d->format('M Y'),
             ];
         }
-        $part1Last6Labels = array_column($last6Months, 'label');
+        $part1Last6Labels = array_column($last6Months, 'label'); // 例：Oct 2025, Nov 2025, ..., Mar 2026
         $part2Labels = $part1Last6Labels;
         $part1Last6Series = [];
         $part2Series = [];
+
         $yearsNeeded = array_unique(array_column($last6Months, 'year'));
 
         foreach ($companies as $c) {
@@ -198,18 +252,18 @@ class DashboardController extends Controller
                     }
                 }
             }
-            $part1Last6 = [];
-            $part2Last6 = [];
+            $part1Data = [];
+            $part2Data = [];
             foreach ($last6Months as $cell) {
                 $yr = $cell['year'];
                 $m = $cell['month'];
                 $p1 = $part1ByYearMonth[$yr][$m] ?? 0;
                 $p2 = $part2ByYearMonth[$yr][$m] ?? 0;
-                $part1Last6[] = round($p1, 2);
-                $part2Last6[] = round($p1 + $p2, 2);
+                $part1Data[] = round($p1, 2);
+                $part2Data[] = round($p1 + $p2, 2);
             }
-            $part1Last6Series[] = ['name' => $c->name, 'data' => $part1Last6];
-            $part2Series[] = ['name' => $c->name, 'data' => $part2Last6];
+            $part1Last6Series[] = ['name' => $c->name, 'data' => $part1Data];
+            $part2Series[] = ['name' => $c->name, 'data' => $part2Data];
         }
 
         return view('dashboard', [
@@ -221,7 +275,7 @@ class DashboardController extends Controller
             'depositTotalMinor' => $depositTotalMinor,
             'withdrawalTotalMinor' => $withdrawalTotalMinor,
             'columnTotals' => $columnTotals,
-            'reportYear' => $reportYear,
+            'pieLast3' => $pieLast3,
             'part1Last6Labels' => $part1Last6Labels,
             'part1Last6Series' => $part1Last6Series,
             'part2Labels' => $part2Labels,
