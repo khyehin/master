@@ -17,4 +17,10 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            whoami
+            hostname
+            pwd
+            ls -la /var/www/html
+            ls -la /var/www/html/mymaster33 || true
+            ls -la /var/www/html/mymaster33/deploy.sh || true
             bash /var/www/html/mymaster33/deploy.sh
