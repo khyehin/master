@@ -21,7 +21,7 @@
             <div class="report-actions-top">
                 <form method="get" action="{{ route('companies.report', $company->id) }}" class="flex items-center gap-2">
                     <label for="year" class="text-sm text-gray-600">{{ __('Year') }}</label>
-                    <select id="year" name="year" class="rounded border border-gray-300 px-2.5 py-2 text-sm" onchange="this.form.submit()">
+                    <select id="year" name="year" class="report-year-select rounded border border-gray-300 px-3 py-2 text-base font-semibold text-gray-900" onchange="this.form.submit()">
                         @foreach($years as $y)
                             <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option>
                         @endforeach
@@ -301,6 +301,15 @@
           align-items:center;
           gap:.5rem;
           flex-wrap:wrap;
+        }
+        /* 年份下拉：不顯示箭頭，年份數字更清楚 */
+        .report-year-select{
+          appearance:none;
+          -webkit-appearance:none;
+          -moz-appearance:none;
+          background:#fff;
+          padding-right:0.75rem;
+          min-width:4.5rem;
         }
         
         /* ===== 每个 Part 容器 ===== */
