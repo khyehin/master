@@ -38,6 +38,8 @@
         .companies-list-page .user-list-table.companies-list-table {
             font-size: 0.875rem;
             line-height: 1.4;
+            /* 允许 3 粒点下拉菜单超出表格边框，不被圆角表格裁掉 */
+            overflow: visible;
         }
         .companies-list-page .user-list-table.companies-list-table .user-th {
             font-size: 0.75rem;
@@ -72,37 +74,6 @@
         .companies-list-page .companies-table-scroll {
             overflow-x: auto;
             overflow-y: visible;
-        }
-        /* 下拉：浮层 box + hover 高亮；挂到全局 portal，避免被任何容器裁切 */
-        .companies-list-page .user-actions-dropdown {
-            position: fixed !important;
-            right: auto !important;
-            top: auto !important;
-            left: auto !important;
-            background: #fff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 10px !important;
-            box-shadow: 0 12px 28px rgba(0,0,0,0.15), 0 6px 12px rgba(0,0,0,0.08) !important;
-            padding: 6px 0 !important;
-            max-height: 220px !important;
-            overflow-y: auto !important;
-            z-index: 9999 !important;
-        }
-        .companies-list-page .user-actions-dropdown a {
-            display: block !important;
-            padding: 8px 14px !important;
-            background: transparent !important;
-            transition: background 0.15s ease !important;
-        }
-        .companies-list-page .user-actions-dropdown a:hover {
-            background: #e5e7eb !important;
-        }
-        .companies-list-page .user-actions-dropdown .user-actions-item--danger {
-            background: transparent !important;
-            transition: background 0.15s ease !important;
-        }
-        .companies-list-page .user-actions-dropdown .user-actions-item--danger:hover {
-            background: #fee2e2 !important;
         }
     </style>
     <div class="max-w-7xl mx-auto w-full pb-12 companies-list-page">
@@ -141,48 +112,16 @@
                             <td class="user-td">{{ strtoupper($c->base_currency ?? 'USD') }}</td>
                             <td class="user-td">
                                 <div class="user-actions-wrap"
-                                     x-data="{
-                                        open: false,
-                                        menuStyles: '',
-                                        reposition() {
-                                            this.$nextTick(() => {
-                                                const trigger = this.$el.querySelector('.user-actions-trigger');
-                                                const menu = this.$refs.menu;
-                                                if (!trigger || !menu) return;
-                                                const rect = trigger.getBoundingClientRect();
-                                                const menuRect = menu.getBoundingClientRect();
-                                                const padding = 8;
-                                                let top = rect.bottom + 8;
-                                                let left = rect.right - menuRect.width;
-                                                if (top + menuRect.height > window.innerHeight - padding && rect.top - menuRect.height - 8 > padding) {
-                                                    top = rect.top - menuRect.height - 8;
-                                                }
-                                                if (left + menuRect.width > window.innerWidth - padding) {
-                                                    left = window.innerWidth - menuRect.width - padding;
-                                                }
-                                                if (left < padding) left = padding;
-                                                this.menuStyles = `top:${top}px; left:${left}px;`;
-                                            });
-                                        },
-                                        toggle() {
-                                            this.open = !this.open;
-                                            if (this.open) {
-                                                this.reposition();
-                                            }
-                                        }
-                                     }"
-                                     @resize.window="open && reposition()">
+                                     x-data="{ open: false }">
                                     <button type="button"
                                             class="user-actions-trigger"
-                                            @click="toggle()"
+                                            @click="open = !open"
                                             aria-haspopup="true"
                                             :aria-expanded="open"
                                             aria-label="{{ __('Actions') }}"><span>⋯</span></button>
                                     <div class="user-actions-dropdown"
                                          x-ref="menu"
-                                         x-teleport="#drp-portal"
                                          x-show="open"
-                                         :style="menuStyles"
                                          @click.outside="open = false"
                                          @keydown.escape.window="open = false"
                                          x-cloak

@@ -33,6 +33,7 @@
             background: #eef1f6;
         }
         .auth-main { padding: 3cm 10cm; }
+        @media (max-width: 1024px) { .auth-main { padding: 2.5cm 3cm; } }
         @media (max-width: 768px) { .auth-main { padding: 2cm 1.5cm; } }
         .login-box {
             background: #fff;
@@ -77,7 +78,7 @@
         <div class="w-full lg:flex-1 flex items-center justify-center mx-auto">
             <div class="login-box">
                 <div class="flex justify-center mb-4 min-h-[90px] items-center">
-                    <span class="font-semibold tracking-[0.35em] text-slate-700 uppercase" style="font-size:45px;">
+                    <span class="font-semibold tracking-[0.35em] text-slate-700 uppercase text-3xl sm:text-4xl lg:text-5xl">
                         Welcome
                     </span>
                 </div>

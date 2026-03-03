@@ -602,12 +602,16 @@
   top: 100%;
   margin-top: 8px;
   min-width: 11rem;
+  max-width: 90vw;
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 10px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15), 0 6px 12px rgba(0, 0, 0, 0.08);
   padding: 6px 0;
   z-index: 50;
+  max-height: 220px;
+  overflow-y: auto;
+  box-sizing: border-box;
   transform-origin: top right;
 }
 .user-actions-dropdown a {
@@ -620,6 +624,8 @@
   text-decoration: none;
   background: transparent;
   transition: background 0.15s ease;
+  white-space: normal;
+  word-break: break-word;
 }
 .user-actions-dropdown a:hover {
   background: #e5e7eb;
