@@ -17,4 +17,4 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            bash ${{ secrets.APP_DIR }}/deploy.sh
+            bash /var/www/html/mymaster33/deploy.sh
