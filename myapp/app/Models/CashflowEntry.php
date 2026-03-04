@@ -17,6 +17,7 @@ class CashflowEntry extends Model
         'entry_date',
         'category',
         'currency',
+        'display_order',
         'amount_minor',
         'fx_rate_to_base',
         'base_amount_minor',

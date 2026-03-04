@@ -57,6 +57,8 @@
         .cf-page .cf-filter-field .form-group > label { margin-bottom: 0 !important; }
         /* Nudge Remark + buttons down to align visually with Date Range */
         .cf-page .cf-filter-nudge { margin-top: 6px; }
+        /* 可拖曳的 row（類似 Excel 拖動整行） */
+        .cf-row-draggable { cursor: move; }
         .cf-delete-row-btn {
             display: inline-flex; align-items: center; justify-content: center;
             width: 1.25rem; height: 1.25rem; padding: 0; font-size: 1rem; line-height: 1;
@@ -165,21 +167,23 @@
             <input type="hidden" name="date_to" value="{{ $filters['date_to'] ?? '' }}">
             <input type="hidden" name="date_all" value="{{ $filters['date_all'] ?? '0' }}">
             <input type="hidden" name="remark" value="{{ $filters['remark'] ?? '' }}">
+            <input type="hidden" name="row_order" id="cf-row-order" value="">
+            <input type="hidden" name="column_order" id="cf-col-order" value="">
             <div class="p-0">
                 <div class="report-table-wrap overflow-x-auto">
                     <table class="cf-table report-table cf-table--gray w-full" style="min-width: 700px;">
                         <thead>
                             <tr>
-                                <th class="cf-th">{{ __('Date') }}</th>
-                                <th class="cf-th">{{ __('Deposit') }}</th>
-                                <th class="cf-th">{{ __('Withdrawals') }}</th>
-                                <th class="cf-th">AFFIN</th>
-                                <th class="cf-th">{{ __('Total') }}</th>
-                                <th class="cf-th">Xe USDT</th>
+                                <th class="cf-th cf-col-draggable" draggable="true" data-col-key="date">{{ __('Date') }}</th>
+                                <th class="cf-th cf-col-draggable" draggable="true" data-col-key="deposit">{{ __('Deposit') }}</th>
+                                <th class="cf-th cf-col-draggable" draggable="true" data-col-key="withdrawal">{{ __('Withdrawals') }}</th>
+                                <th class="cf-th cf-col-draggable" draggable="true" data-col-key="affin">AFFIN</th>
+                                <th class="cf-th cf-col-draggable" draggable="true" data-col-key="total">{{ __('Total') }}</th>
+                                <th class="cf-th cf-col-draggable" draggable="true" data-col-key="xe_usdt">Xe USDT</th>
                                 @foreach($extraColumns as $col)
-                                    <th class="cf-th">{{ $col->name }}</th>
+                                    <th class="cf-th cf-col-draggable" draggable="true" data-col-key="extra:{{ $col->id }}">{{ $col->name }}</th>
                                 @endforeach
-                                <th class="cf-th cf-td--left">{{ __('Remark') }}</th>
+                                <th class="cf-th cf-td--left cf-col-draggable" draggable="true" data-col-key="remark">{{ __('Remark') }}</th>
                                 @if($canDelete ?? false)
                                 <th class="cf-th cf-delete-col" style="width:2.5rem;">{{ __('Delete') }}</th>
                                 @endif
@@ -264,7 +268,7 @@
                                     </tr>
                                     @php $printedBfMonths[] = $monthKey; @endphp
                                 @endif
-                                <tr data-entry-id="{{ $e->id }}">
+                                <tr data-entry-id="{{ $e->id }}" class="cf-row-draggable" draggable="true">
                                     <td class="cf-td">
                                         <span class="cf-view-cell">{{ $e->entry_date->format('Y-m-d') }}</span>
                                         <span class="cf-edit-cell"><input type="date" name="entries[{{ $e->id }}][entry_date]" class="cf-input" value="{{ $e->entry_date->format('Y-m-d') }}"></span>
@@ -318,7 +322,7 @@
                             @endforelse
                         </tbody>
                         {{-- Template for new row (cloned by JS); disabled so not submitted/validated --}}
-                        <tr id="cf-new-row-tpl" style="display: none;">
+                        <tr id="cf-new-row-tpl" class="cf-new-row cf-row-draggable" style="display: none;" draggable="true">
                             <td class="cf-td"><input type="date" name="new_rows[0][entry_date]" class="cf-input" disabled></td>
                             <td class="cf-td"><input type="number" name="new_rows[0][deposit]" class="cf-input cf-input-deposit" step="0.01" placeholder="0" disabled></td>
                             <td class="cf-td"><input type="number" name="new_rows[0][withdrawal]" class="cf-input cf-input-withdrawal" step="0.01" placeholder="0" disabled></td>
@@ -329,7 +333,12 @@
                                 <td class="cf-td"><input type="number" name="new_rows[0][extra][{{ $col->id }}]" class="cf-input" step="0.01" placeholder="0" value="0" disabled></td>
                             @endforeach
                             <td class="cf-td"><input type="text" name="new_rows[0][description]" class="cf-input" placeholder="{{ __('Remark') }}" style="max-width: 12rem;" disabled></td>
-                            @if($canDelete ?? false)<td class="cf-td cf-delete-col"></td>@endif
+                            <td class="cf-td cf-delete-col">
+                                {{-- 這些只作用於尚未儲存的新列：上下移動與刪除，不觸發後端 --}}
+                                <button type="button" class="cf-delete-row-btn cf-new-row-move-up" title="{{ __('Move up') }}" style="margin-right:2px;">↑</button>
+                                <button type="button" class="cf-delete-row-btn cf-new-row-move-down" title="{{ __('Move down') }}" style="margin-right:2px;">↓</button>
+                                <button type="button" class="cf-delete-row-btn cf-new-row-delete" title="{{ __('Delete row') }}">×</button>
+                            </td>
                         </tr>
                         @if($entries->isNotEmpty())
                             @php
@@ -399,6 +408,9 @@
     (function() {
         var pageWrap = document.getElementById('cf-page-wrap');
         var form = document.getElementById('cf-form');
+        var table = form && form.querySelector('table.cf-table');
+        var thead = table && table.querySelector('thead');
+        var headerRow = thead && thead.querySelector('tr');
         var tbody = form && form.querySelector('table tbody');
         var tpl = document.getElementById('cf-new-row-tpl');
         var addBtn = document.getElementById('cf-add-row');
@@ -406,7 +418,50 @@
         var editActions = document.getElementById('cf-edit-actions');
         var saveWrap = document.getElementById('cf-save-wrap');
         var rowIndex = 0;
-        if (!tbody || !tpl || !addBtn || !editBtn) return;
+        var dragRow = null;
+        var dragColFrom = null;
+        if (!tbody || !tpl || !addBtn || !editBtn || !table || !headerRow) return;
+
+        function cellIndex(cell) {
+            return Array.prototype.indexOf.call(cell.parentNode.children, cell);
+        }
+
+        function moveColumn(from, to) {
+            if (from === to || from < 0 || to < 0) return;
+            table.querySelectorAll('tr').forEach(function(row) {
+                var firstCell = row.firstElementChild;
+                if (firstCell && firstCell.hasAttribute('colspan')) return;
+                if (!row.children) return;
+                var cells = row.children;
+                if (!cells[from] || !cells[to]) return;
+                var moving = cells[from];
+                if (to > from) {
+                    row.insertBefore(moving, cells[to].nextSibling);
+                } else {
+                    row.insertBefore(moving, cells[to]);
+                }
+            });
+        }
+
+        function currentColumnKeys() {
+            var keys = [];
+            headerRow.querySelectorAll('th.cf-col-draggable').forEach(function(th) {
+                keys.push(th.getAttribute('data-col-key') || '');
+            });
+            return keys.filter(Boolean);
+        }
+
+        // Apply persisted column order on load
+        var initialColumnOrder = @json($columnOrder ?? []);
+        if (Array.isArray(initialColumnOrder) && initialColumnOrder.length) {
+            initialColumnOrder.forEach(function(key, targetIndex) {
+                var th = headerRow.querySelector('th.cf-col-draggable[data-col-key="' + key.replace(/"/g, '\\"') + '"]');
+                if (!th) return;
+                var from = cellIndex(th);
+                // After moving, indices change; move this key to targetIndex iteratively
+                moveColumn(from, targetIndex);
+            });
+        }
 
         // Decide default date for new rows:
         // - If user选择了 date range，用 date_from（否则 date_to）那个月
@@ -449,6 +504,34 @@
             }
         }
 
+        // Header 拖動：調整整個 column 的顯示順序（僅前端，且只有在 Edit 模式）
+        headerRow.addEventListener('dragstart', function(ev) {
+            if (!pageWrap || !pageWrap.classList.contains('cf-edit-mode')) return;
+            var th = ev.target.closest('th.cf-col-draggable');
+            if (!th) return;
+            dragColFrom = cellIndex(th);
+            ev.dataTransfer.effectAllowed = 'move';
+        });
+        headerRow.addEventListener('dragover', function(ev) {
+            if (dragColFrom === null) return;
+            var th = ev.target.closest('th.cf-col-draggable');
+            if (!th) return;
+            ev.preventDefault();
+        });
+        headerRow.addEventListener('drop', function(ev) {
+            if (dragColFrom === null) return;
+            var thTo = ev.target.closest('th.cf-col-draggable');
+            if (!thTo) return;
+            ev.preventDefault();
+            var to = cellIndex(thTo);
+            var from = dragColFrom;
+            dragColFrom = null;
+            if (from === to || from < 0 || to < 0) return;
+
+            moveColumn(from, to);
+        });
+        headerRow.addEventListener('dragend', function() { dragColFrom = null; });
+
         editBtn.addEventListener('click', function() {
             var isEdit = pageWrap && pageWrap.classList.contains('cf-edit-mode');
             if (isEdit) {
@@ -471,6 +554,7 @@
             var clone = tpl.cloneNode(true);
             clone.id = '';
             clone.style.display = '';
+            clone.classList.add('cf-new-row');
             [].forEach.call(clone.querySelectorAll('input'), function(inp) { inp.removeAttribute('disabled'); });
             clone.querySelector('input[name="new_rows[0][entry_date]"]').setAttribute('value', defaultDate());
             clone.querySelector('.cf-input-deposit').value = '';
@@ -498,6 +582,97 @@
             if (row && ev.target.classList.contains('cf-input-total')) {
                 onTotalManual(row, ev.target);
             }
+        });
+
+        // 新增列的「移動 / 刪除」在前端完成，不影響已存在的資料
+        tbody.addEventListener('click', function(ev) {
+            var target = ev.target;
+            if (!target.closest) return;
+            var row = target.closest('tr.cf-new-row');
+            if (!row) return;
+
+            if (target.classList.contains('cf-new-row-delete')) {
+                row.parentNode.removeChild(row);
+                return;
+            }
+            if (target.classList.contains('cf-new-row-move-up')) {
+                var prev = row.previousElementSibling;
+                // 跳過模板行
+                while (prev && prev.id === 'cf-new-row-tpl') {
+                    prev = prev.previousElementSibling;
+                }
+                if (prev) {
+                    row.parentNode.insertBefore(row, prev);
+                }
+                return;
+            }
+            if (target.classList.contains('cf-new-row-move-down')) {
+                var next = row.nextElementSibling;
+                // 跳過模板行
+                while (next && next.id === 'cf-new-row-tpl') {
+                    next = next.nextElementSibling;
+                }
+                if (next) {
+                    row.parentNode.insertBefore(next, row);
+                }
+                return;
+            }
+        });
+
+        // 整行拖拽（類似 Excel 拖動 row），僅改前端順序，且只有在 Edit 模式
+        tbody.addEventListener('dragstart', function(ev) {
+            if (!pageWrap || !pageWrap.classList.contains('cf-edit-mode')) return;
+            var row = ev.target.closest('tr.cf-row-draggable');
+            if (!row) return;
+            dragRow = row;
+            ev.dataTransfer.effectAllowed = 'move';
+        });
+        tbody.addEventListener('dragover', function(ev) {
+            if (!dragRow) return;
+            var targetRow = ev.target.closest('tr.cf-row-draggable');
+            if (!targetRow || targetRow === dragRow) return;
+            ev.preventDefault();
+        });
+        tbody.addEventListener('drop', function(ev) {
+            if (!dragRow) return;
+            var targetRow = ev.target.closest('tr.cf-row-draggable');
+            if (!targetRow || targetRow === dragRow) return;
+            ev.preventDefault();
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr.cf-row-draggable'));
+            var from = rows.indexOf(dragRow);
+            var to = rows.indexOf(targetRow);
+            if (from === -1 || to === -1) return;
+            if (from < to) {
+                tbody.insertBefore(dragRow, targetRow.nextSibling);
+            } else {
+                tbody.insertBefore(dragRow, targetRow);
+            }
+            dragRow = null;
+        });
+        tbody.addEventListener('dragend', function() { dragRow = null; });
+
+        // Submit: persist row_order + column_order together
+        form.addEventListener('submit', function() {
+            // Row order tokens
+            var tokens = [];
+            tbody.querySelectorAll('tr.cf-row-draggable').forEach(function(row) {
+                var id = row.getAttribute('data-entry-id');
+                if (id) {
+                    tokens.push('e:' + id);
+                } else {
+                    var anyInput = row.querySelector('input[name^="new_rows["]');
+                    if (!anyInput) return;
+                    var m = anyInput.name.match(/^new_rows\[(\d+)\]/);
+                    if (!m) return;
+                    tokens.push('n:' + m[1]);
+                }
+            });
+            var rowOrderInput = document.getElementById('cf-row-order');
+            if (rowOrderInput) rowOrderInput.value = tokens.join(',');
+
+            // Column order keys (excluding Delete)
+            var colOrderInput = document.getElementById('cf-col-order');
+            if (colOrderInput) colOrderInput.value = JSON.stringify(currentColumnKeys());
         });
     })();
     (function() {

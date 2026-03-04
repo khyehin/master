@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CashflowEntry;
 use App\Models\CashflowCategory;
+use App\Models\CashflowColumnOrder;
 use App\Models\CashflowExtraColumn;
 use App\Models\Company;
 use App\Services\AuditLogger;
@@ -94,9 +95,10 @@ class CashflowController extends Controller
         }
 
         $query = (clone $baseQuery)->with(['company', 'user', 'extraValues'])
-            // Show month days from 1 -> 31 (ascending)
+            // 先按 display_order，如果沒有就排在後面，再按日期與 id
+            ->orderByRaw('CASE WHEN display_order IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('display_order', 'asc')
             ->orderBy('entry_date', 'asc')
-            // For same date, keep in input/creation order (older first)
             ->orderBy('id', 'asc');
 
         $entries = $query->paginate(50)->withQueryString();
@@ -107,6 +109,22 @@ class CashflowController extends Controller
             'remark' => $remark,
         ];
         $extraColumns = CashflowExtraColumn::ordered()->get();
+
+        // Column order (persisted per company_id; 0 = Master)
+        $defaultColumnOrder = ['date', 'deposit', 'withdrawal', 'affin', 'total', 'xe_usdt'];
+        foreach ($extraColumns as $col) {
+            $defaultColumnOrder[] = 'extra:' . $col->id;
+        }
+        $defaultColumnOrder[] = 'remark';
+
+        $orderRec = CashflowColumnOrder::where('company_id', (int) $companyId)->first();
+        $columnOrder = $orderRec?->order ?? $defaultColumnOrder;
+        if (! is_array($columnOrder)) {
+            $columnOrder = $defaultColumnOrder;
+        }
+        $columnOrder = array_values(array_unique(array_intersect($columnOrder, $defaultColumnOrder)));
+        $missing = array_values(array_diff($defaultColumnOrder, $columnOrder));
+        $columnOrder = array_merge($columnOrder, $missing);
 
         // Monthly closing balances (up to end of that month) for "balance brought forward"
         // Track Total (amount_minor), Affin (affin_minor) and Xe+USDT (xe_minor+usdt_minor).
@@ -146,6 +164,7 @@ class CashflowController extends Controller
             'monthlyClosing' => $monthlyClosing,
             'extraColumns' => $extraColumns,
             'filters' => $filters,
+            'columnOrder' => $columnOrder,
         ]);
     }
 
@@ -201,6 +220,8 @@ class CashflowController extends Controller
         $currentCompanyId = $request->integer('company_id');
         $entriesInput = $request->input('entries', []);
         $newRows = $request->input('new_rows', []);
+        $rowOrderRaw = (string) $request->input('row_order', '');
+        $columnOrderRaw = $request->input('column_order', null);
         if (! is_array($entriesInput)) {
             $entriesInput = [];
         }
@@ -209,6 +230,22 @@ class CashflowController extends Controller
         }
 
         $hasDepCols = Schema::hasColumn('cashflow_entries', 'deposit_minor') && Schema::hasColumn('cashflow_entries', 'withdrawal_minor');
+
+        // row_order tokens: "e:{id}" or "n:{index}" -> display_order
+        $rowTokens = array_values(array_filter(array_map('trim', explode(',', $rowOrderRaw))));
+        $displayOrderMapExisting = [];
+        $displayOrderMapNew = [];
+        $counter = 0;
+        foreach ($rowTokens as $t) {
+            $counter++;
+            if (str_starts_with($t, 'e:')) {
+                $id = (int) substr($t, 2);
+                if ($id > 0) $displayOrderMapExisting[$id] = $counter;
+            } elseif (str_starts_with($t, 'n:')) {
+                $idx = (int) substr($t, 2);
+                $displayOrderMapNew[$idx] = $counter;
+            }
+        }
 
         $updated = 0;
         foreach ($entriesInput as $id => $row) {
@@ -238,6 +275,7 @@ class CashflowController extends Controller
                 $total = ((float) ($depositVal ?? 0)) - ((float) ($withdrawalVal ?? 0));
             }
             $amountMinor = (int) round($total * 100);
+
             $payload = [
                 'entry_date' => $row['entry_date'] ?? $entry->entry_date->format('Y-m-d'),
                 'amount_minor' => $amountMinor,
@@ -246,6 +284,9 @@ class CashflowController extends Controller
                 'usdt_minor' => (int) round((float) ($row['xe_usdt'] ?? 0) * 100),
                 'description' => $row['description'] ?? $entry->description,
             ];
+            if (isset($displayOrderMapExisting[$id])) {
+                $payload['display_order'] = (int) $displayOrderMapExisting[$id];
+            }
             if ($hasDepCols) {
                 $payload['deposit_minor'] = $depositVal !== null ? (int) round($depositVal * 100) : null;
                 $payload['withdrawal_minor'] = $withdrawalVal !== null ? (int) round($withdrawalVal * 100) : null;
@@ -266,7 +307,7 @@ class CashflowController extends Controller
         }
 
         $created = 0;
-        foreach ($newRows as $row) {
+        foreach ($newRows as $idx => $row) {
             $entryDate = $row['entry_date'] ?? null;
             if (! $entryDate) {
                 continue;
@@ -287,6 +328,7 @@ class CashflowController extends Controller
             }
             $amountMinor = (int) round($total * 100);
             $description = $row['description'] ?? '';
+
             $createPayload = [
                 'user_id' => Auth::id(),
                 'company_id' => $companyId,
@@ -301,12 +343,27 @@ class CashflowController extends Controller
                 'usdt_minor' => (int) round((float) ($row['xe_usdt'] ?? 0) * 100),
                 'description' => $description,
             ];
+            $idxInt = (int) $idx;
+            if (isset($displayOrderMapNew[$idxInt])) {
+                $createPayload['display_order'] = (int) $displayOrderMapNew[$idxInt];
+            }
             if ($hasDepCols) {
                 $createPayload['deposit_minor'] = $depositVal !== null ? (int) round($depositVal * 100) : null;
                 $createPayload['withdrawal_minor'] = $withdrawalVal !== null ? (int) round($withdrawalVal * 100) : null;
             }
             CashflowEntry::create($createPayload);
             $created++;
+        }
+
+        // Persist column order (per company_id) if provided (JSON array string)
+        if ($columnOrderRaw !== null) {
+            $decoded = is_string($columnOrderRaw) ? json_decode($columnOrderRaw, true) : $columnOrderRaw;
+            if (is_array($decoded)) {
+                CashflowColumnOrder::updateOrCreate(
+                    ['company_id' => (int) $currentCompanyId],
+                    ['order' => array_values($decoded)]
+                );
+            }
         }
 
         $msg = $updated > 0 || $created > 0 ? __('Saved.') : __('No rows to save.');
