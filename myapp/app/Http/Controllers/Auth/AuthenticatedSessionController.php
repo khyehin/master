@@ -29,11 +29,18 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         AuditLogger::log('user.login', [
             'user_id' => $user->id,
             'username' => $user->username,
         ]);
+
+        // First login: force reset password before PIN
+        if ($user->password_changed_at === null) {
+            return redirect()->route('password.first');
+        }
+
         if ($user->pin_set_at === null) {
             return redirect()->route('pin.setup');
         }

@@ -40,6 +40,10 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    // First login: force reset password, then PIN
+    Route::get('password/first', [PasswordController::class, 'showFirst'])->name('password.first');
+    Route::post('password/first', [PasswordController::class, 'storeFirst'])->name('password.first.store');
+
     Route::get('pin/verify', [PinVerifyController::class, 'show'])->name('pin.verify');
     Route::post('pin/verify', [PinVerifyController::class, 'verify']);
     Route::get('pin/setup', [PinSetupController::class, 'show'])->name('pin.setup');
