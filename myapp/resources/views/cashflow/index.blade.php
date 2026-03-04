@@ -17,6 +17,7 @@
         .cf-page:not(.cf-edit-mode) .cf-edit-cell { display: none; }
         .cf-page:not(.cf-edit-mode) .cf-view-cell { display: block; }
         .cf-page .cf-td.cf-td--withdrawal { color: #dc2626; }
+        .cf-page .cf-input-withdrawal { color: #dc2626; }
         .cf-page .cf-tfoot .cf-td { pointer-events: none; }
         .cf-page .cf-filter-field { width: 260px; max-width: 260px; }
         .cf-page .cf-top-select,
@@ -302,7 +303,7 @@
                                         </span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][deposit]" class="cf-input cf-input-deposit" step="0.01" value="{{ $depositVal !== null ? $depositVal : 0 }}"></span>
                                     </td>
-                                    <td class="cf-td cf-td--amount {{ !$isIn ? 'cf-td--withdrawal' : '' }}">
+                                    <td class="cf-td cf-td--amount {{ ($withdrawalVal ?? 0) > 0 ? 'cf-td--withdrawal' : '' }}">
                                         <span class="cf-view-cell">
                                             @php
                                                 $showWd = ($withdrawalVal !== null && abs($withdrawalVal) > 0);
