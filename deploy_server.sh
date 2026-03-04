@@ -13,7 +13,7 @@ echo "==> Composer install"
 cd "$LARAVEL_DIR"
 composer install --no-dev --optimize-autoloader
 
-# 如果你确认有 migration 才打开这一行（不确定先别开）
+# 如果你确认这次有新增 migration，取消注释下一行
 # php artisan migrate --force
 
 echo "==> Clear caches"
