@@ -18,5 +18,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /var/www/html/mymaster33
+            git fetch origin
+            git reset --hard origin/main
             chmod +x ./deploy_server.sh
             bash ./deploy_server.sh
