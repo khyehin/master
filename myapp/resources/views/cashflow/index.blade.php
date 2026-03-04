@@ -228,15 +228,14 @@
                                     <td class="cf-td cf-td--amount {{ ($bfTotalMinor ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
                                         {{ ($bfTotalMinor ?? 0) >= 0 ? number_format(($bfTotalMinor ?? 0) / 100, 2) : '(' . number_format(abs(($bfTotalMinor ?? 0)) / 100, 2) . ')' }}
                                     </td>
-                                    <td class="cf-td cf-td--amount {{ ($bfXeUsdtMinor ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
-                                        {{ ($bfXeUsdtMinor ?? 0) >= 0 ? number_format(($bfXeUsdtMinor ?? 0) / 100, 2) : '(' . number_format(abs(($bfXeUsdtMinor ?? 0)) / 100, 2) . ')' }}
+                                    @php $bfXe = $bfXeUsdtMinor ?? 0; @endphp
+                                    <td class="cf-td cf-td--amount {{ $bfXe < 0 ? 'cf-td--withdrawal' : '' }}">
+                                        {{ $bfXe >= 0 ? number_format($bfXe / 100, 2) : '(' . number_format(abs($bfXe) / 100, 2) . ')' }}
                                     </td>
                                     @foreach($extraColumns as $col)
-                                        @php $bfExtra = $bfExtraMinors[$col->id] ?? null; @endphp
-                                        <td class="cf-td cf-td--amount {{ ($bfExtra ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
-                                            @if($bfExtra !== null)
-                                                {{ $bfExtra >= 0 ? number_format($bfExtra / 100, 2) : '(' . number_format(abs($bfExtra) / 100, 2) . ')' }}
-                                            @endif
+                                        @php $bfExtra = $bfExtraMinors[$col->id] ?? 0; @endphp
+                                        <td class="cf-td cf-td--amount {{ $bfExtra < 0 ? 'cf-td--withdrawal' : '' }}">
+                                            {{ $bfExtra >= 0 ? number_format($bfExtra / 100, 2) : '(' . number_format(abs($bfExtra) / 100, 2) . ')' }}
                                         </td>
                                     @endforeach
                                     <td class="cf-td cf-td--left">{{ __('Balance bring forward') }} {{ $bfLabel }}</td>
@@ -271,18 +270,17 @@
                                         <td class="cf-td cf-td--amount {{ ($bfTotalMinor ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
                                             {{ ($bfTotalMinor ?? 0) >= 0 ? number_format(($bfTotalMinor ?? 0) / 100, 2) : '(' . number_format(abs(($bfTotalMinor ?? 0)) / 100, 2) . ')' }}
                                         </td>
-                                        <td class="cf-td cf-td--amount {{ ($bfXeUsdtMinor ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
-                                            {{ ($bfXeUsdtMinor ?? 0) >= 0 ? number_format(($bfXeUsdtMinor ?? 0) / 100, 2) : '(' . number_format(abs(($bfXeUsdtMinor ?? 0)) / 100, 2) . ')' }}
+                                         @php $bfXe2 = $bfXeUsdtMinor ?? 0; @endphp
+                                         <td class="cf-td cf-td--amount {{ $bfXe2 < 0 ? 'cf-td--withdrawal' : '' }}">
+                                             {{ $bfXe2 >= 0 ? number_format($bfXe2 / 100, 2) : '(' . number_format(abs($bfXe2) / 100, 2) . ')' }}
                                         </td>
                                         @foreach($extraColumns as $col)
                                             @php
                                                 $colId = $col->id;
-                                                $bfExtra = $monthlyClosing['extra_minor'][$colId][$prevMonthKey] ?? null;
+                                                $bfExtra = $monthlyClosing['extra_minor'][$colId][$prevMonthKey] ?? 0;
                                             @endphp
-                                            <td class="cf-td cf-td--amount {{ ($bfExtra ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
-                                                @if($bfExtra !== null)
-                                                    {{ $bfExtra >= 0 ? number_format($bfExtra / 100, 2) : '(' . number_format(abs($bfExtra) / 100, 2) . ')' }}
-                                                @endif
+                                            <td class="cf-td cf-td--amount {{ $bfExtra < 0 ? 'cf-td--withdrawal' : '' }}">
+                                                {{ $bfExtra >= 0 ? number_format($bfExtra / 100, 2) : '(' . number_format(abs($bfExtra) / 100, 2) . ')' }}
                                             </td>
                                         @endforeach
                                         <td class="cf-td cf-td--left">{{ __('Balance bring forward') }} {{ $bfLabel }}</td>
@@ -315,8 +313,10 @@
                                         <span class="cf-view-cell">{{ $isIn ? number_format($amt, 2) : '(' . number_format(abs($amt), 2) . ')' }}</span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][total]" class="cf-input cf-input-total" step="0.01" value="{{ $amt }}"></span>
                                     </td>
-                                    <td class="cf-td cf-td--amount">
-                                        <span class="cf-view-cell">{{ number_format($xeUsdt, 2) }}</span>
+                                    <td class="cf-td cf-td--amount {{ $xeUsdt < 0 ? 'cf-td--withdrawal' : '' }}">
+                                        <span class="cf-view-cell">
+                                            {{ $xeUsdt >= 0 ? number_format($xeUsdt, 2) : '(' . number_format(abs($xeUsdt), 2) . ')' }}
+                                        </span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][xe_usdt]" class="cf-input" step="0.01" value="{{ $xeUsdt }}"></span>
                                     </td>
                                     @foreach($extraColumns as $col)
@@ -391,7 +391,9 @@
                                     <td class="cf-td cf-td--amount cf-td--withdrawal">({{ number_format($totalWithdrawal, 2) }})</td>
                                     <td class="cf-td cf-td--amount">{{ number_format($totalAffin, 2) }}</td>
                                     <td class="cf-td cf-td--amount {{ $net < 0 ? 'cf-td--withdrawal' : '' }}">{{ $net >= 0 ? number_format($net, 2) : '(' . number_format(abs($net), 2) . ')' }}</td>
-                                    <td class="cf-td cf-td--amount">{{ number_format($totalXeUsdt, 2) }}</td>
+                                    <td class="cf-td cf-td--amount {{ $totalXeUsdt < 0 ? 'cf-td--withdrawal' : '' }}">
+                                        {{ $totalXeUsdt >= 0 ? number_format($totalXeUsdt, 2) : '(' . number_format(abs($totalXeUsdt), 2) . ')' }}
+                                    </td>
                                     @foreach($extraColumns as $col)
                                         @php $colTotal = $entries->sum(fn ($e) => $e->getExtraValueMinor($col->id)); @endphp
                                         <td class="cf-td cf-td--amount">{{ number_format($colTotal / 100, 2) }}</td>

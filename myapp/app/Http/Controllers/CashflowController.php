@@ -6,6 +6,7 @@ use App\Models\CashflowEntry;
 use App\Models\CashflowCategory;
 use App\Models\CashflowColumnOrder;
 use App\Models\CashflowExtraColumn;
+use App\Models\CashflowEntryExtraValue;
 use App\Models\Company;
 use App\Services\AuditLogger;
 use Carbon\Carbon;
@@ -156,18 +157,27 @@ class CashflowController extends Controller
         // Extra columns monthly closing (running sum per column id)
         if ($extraColumns->isNotEmpty()) {
             $extraIds = $extraColumns->pluck('id')->all();
-            $extraRaw = \App\Models\CashflowEntryExtraValue::query()
-                ->join('cashflow_entries', 'cashflow_entry_extra_values.cashflow_entry_id', '=', 'cashflow_entries.id')
-                ->whereIn('cashflow_entry_extra_values.cashflow_extra_column_id', $extraIds)
-                ->when(! $dateAll, function ($q) use ($dateFrom, $dateTo) {
-                    if ($dateFrom !== '') {
-                        $q->whereDate('entry_date', '>=', $dateFrom);
-                    }
-                    if ($dateTo !== '') {
-                        $q->whereDate('entry_date', '<=', $dateTo);
-                    }
-                })
-                ->selectRaw('cashflow_entry_extra_values.cashflow_extra_column_id as col_id, YEAR(entry_date) as y, MONTH(entry_date) as m, SUM(value_minor) as sum_extra_minor')
+
+            // Start from extra values and join entries, apply the same company scope as $closingBaseQuery
+            $extraClosingBase = CashflowEntryExtraValue::query()
+                ->from('cashflow_entry_extra_values as cev')
+                ->join('cashflow_entries', 'cev.cashflow_entry_id', '=', 'cashflow_entries.id')
+                ->whereIn('cev.cashflow_extra_column_id', $extraIds);
+
+            if ($companyId === 0) {
+                $extraClosingBase->whereNull('cashflow_entries.company_id');
+            } else {
+                if ($companyIds !== []) {
+                    $extraClosingBase->whereIn('cashflow_entries.company_id', $companyIds);
+                }
+                if (in_array($companyId, $companyIds, true)) {
+                    $extraClosingBase->where('cashflow_entries.company_id', $companyId);
+                }
+            }
+
+            // No date limit: we want full-history running sums per column, like total/affin/xe_usdt
+            $extraRaw = $extraClosingBase
+                ->selectRaw('cev.cashflow_extra_column_id as col_id, YEAR(entry_date) as y, MONTH(entry_date) as m, SUM(cev.value_minor) as sum_extra_minor')
                 ->groupBy('col_id', 'y', 'm')
                 ->orderBy('col_id')
                 ->orderBy('y')
