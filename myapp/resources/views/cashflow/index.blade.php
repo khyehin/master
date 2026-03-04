@@ -376,27 +376,56 @@
                                 }
                                 $totalAffinMinor = $entries->sum(fn ($e) => $e->affin_minor ?? 0);
                                 $totalXeUsdtMinor = $entries->sum(fn ($e) => ($e->xe_minor ?? 0) + ($e->usdt_minor ?? 0));
-                                // Bottom "Total" column should match the sum of each row's Total column (amount_minor).
+                                // Sum of current-page rows (period net)
                                 $netMinor = $entries->sum(fn ($e) => $e->amount_minor);
-                                $net = $netMinor / 100;
+
+                                // Closing balances including bring-forward: use monthlyClosing for the last month in this page
+                                $closingMonthKey = optional($entries->last()->entry_date ?? null)->format('Y-m') ?? null;
+                                $closingTotalMinor = $closingMonthKey ? ($monthlyClosing['total_minor'][$closingMonthKey] ?? null) : null;
+                                $closingAffinMinor = $closingMonthKey ? ($monthlyClosing['affin_minor'][$closingMonthKey] ?? null) : null;
+                                $closingXeUsdtMinor = $closingMonthKey ? ($monthlyClosing['xe_usdt_minor'][$closingMonthKey] ?? null) : null;
+
+                                // If we have closing figures, use them; otherwise fall back to period sums
+                                $displayNetMinor = $closingTotalMinor ?? $netMinor;
+                                $displayAffinMinor = $closingAffinMinor ?? $totalAffinMinor;
+                                $displayXeUsdtMinor = $closingXeUsdtMinor ?? $totalXeUsdtMinor;
+
+                                $net = $displayNetMinor / 100;
                                 $totalDeposit = $totalDepositMinor / 100;
                                 $totalWithdrawal = $totalWithdrawalMinor / 100;
-                                $totalAffin = $totalAffinMinor / 100;
-                                $totalXeUsdt = $totalXeUsdtMinor / 100;
+                                $totalAffin = $displayAffinMinor / 100;
+                                $totalXeUsdt = $displayXeUsdtMinor / 100;
+
+                                // Extra columns closing balances per column id
+                                $closingExtraByCol = [];
+                                if ($closingMonthKey) {
+                                    foreach ($extraColumns as $col) {
+                                        $cid = $col->id;
+                                        $closingExtraByCol[$cid] = $monthlyClosing['extra_minor'][$cid][$closingMonthKey] ?? null;
+                                    }
+                                }
                             @endphp
                             <tfoot class="cf-tfoot">
                                 <tr>
                                     <td class="cf-td">{{ __('Total') }}</td>
                                     <td class="cf-td cf-td--amount">{{ number_format($totalDeposit, 2) }}</td>
                                     <td class="cf-td cf-td--amount cf-td--withdrawal">({{ number_format($totalWithdrawal, 2) }})</td>
-                                    <td class="cf-td cf-td--amount">{{ number_format($totalAffin, 2) }}</td>
+                                    <td class="cf-td cf-td--amount {{ $totalAffin < 0 ? 'cf-td--withdrawal' : '' }}">
+                                        {{ $totalAffin >= 0 ? number_format($totalAffin, 2) : '(' . number_format(abs($totalAffin), 2) . ')' }}
+                                    </td>
                                     <td class="cf-td cf-td--amount {{ $net < 0 ? 'cf-td--withdrawal' : '' }}">{{ $net >= 0 ? number_format($net, 2) : '(' . number_format(abs($net), 2) . ')' }}</td>
                                     <td class="cf-td cf-td--amount {{ $totalXeUsdt < 0 ? 'cf-td--withdrawal' : '' }}">
                                         {{ $totalXeUsdt >= 0 ? number_format($totalXeUsdt, 2) : '(' . number_format(abs($totalXeUsdt), 2) . ')' }}
                                     </td>
                                     @foreach($extraColumns as $col)
-                                        @php $colTotal = $entries->sum(fn ($e) => $e->getExtraValueMinor($col->id)); @endphp
-                                        <td class="cf-td cf-td--amount">{{ number_format($colTotal / 100, 2) }}</td>
+                                        @php
+                                            $colId = $col->id;
+                                            $colTotalMinor = $closingExtraByCol[$colId] ?? $entries->sum(fn ($e) => $e->getExtraValueMinor($colId));
+                                            $colTotal = $colTotalMinor / 100;
+                                        @endphp
+                                        <td class="cf-td cf-td--amount {{ $colTotal < 0 ? 'cf-td--withdrawal' : '' }}">
+                                            {{ $colTotal >= 0 ? number_format($colTotal, 2) : '(' . number_format(abs($colTotal), 2) . ')' }}
+                                        </td>
                                     @endforeach
                                     <td class="cf-td"></td>
                                     @if($canDelete ?? false)<td class="cf-td cf-delete-col"></td>@endif
