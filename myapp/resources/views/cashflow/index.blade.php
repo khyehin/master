@@ -293,19 +293,32 @@
                                         <span class="cf-view-cell">{{ $e->entry_date->format('Y-m-d') }}</span>
                                         <span class="cf-edit-cell"><input type="date" name="entries[{{ $e->id }}][entry_date]" class="cf-input" value="{{ $e->entry_date->format('Y-m-d') }}"></span>
                                     </td>
-                                    <td class="cf-td cf-td--amount">
-                                        <span class="cf-view-cell">{{ number_format($depositVal ?? 0, 2) }}</span>
+                                    <td class="cf-td cf-td--amount {{ ($depositVal ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
+                                        <span class="cf-view-cell">
+                                            @php
+                                                $showDeposit = ($depositVal !== null && abs($depositVal) > 0);
+                                            @endphp
+                                            {{ $showDeposit ? number_format($depositVal, 2) : '' }}
+                                        </span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][deposit]" class="cf-input cf-input-deposit" step="0.01" value="{{ $depositVal !== null ? $depositVal : 0 }}"></span>
                                     </td>
                                     <td class="cf-td cf-td--amount {{ !$isIn ? 'cf-td--withdrawal' : '' }}">
                                         <span class="cf-view-cell">
-                                            {{ $withdrawalVal !== null && $withdrawalVal > 0 ? '(' . number_format($withdrawalVal, 2) . ')' : '0.00' }}
+                                            @php
+                                                $showWd = ($withdrawalVal !== null && abs($withdrawalVal) > 0);
+                                            @endphp
+                                            {{ $showWd ? '(' . number_format(abs($withdrawalVal), 2) . ')' : '' }}
                                         </span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][withdrawal]" class="cf-input cf-input-withdrawal" step="0.01" value="{{ $withdrawalVal !== null ? abs($withdrawalVal) : 0 }}"></span>
                                     </td>
                                     <td class="cf-td cf-td--amount {{ $affin < 0 ? 'cf-td--withdrawal' : '' }}">
                                         <span class="cf-view-cell">
-                                            {{ $affin >= 0 ? number_format($affin, 2) : '(' . number_format(abs($affin), 2) . ')' }}
+                                            @php
+                                                $showAffin = abs($affin) > 0;
+                                            @endphp
+                                            @if($showAffin)
+                                                {{ $affin >= 0 ? number_format($affin, 2) : '(' . number_format(abs($affin), 2) . ')' }}
+                                            @endif
                                         </span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][affin]" class="cf-input" step="0.01" value="{{ $affin }}"></span>
                                     </td>
@@ -315,14 +328,27 @@
                                     </td>
                                     <td class="cf-td cf-td--amount {{ $xeUsdt < 0 ? 'cf-td--withdrawal' : '' }}">
                                         <span class="cf-view-cell">
-                                            {{ $xeUsdt >= 0 ? number_format($xeUsdt, 2) : '(' . number_format(abs($xeUsdt), 2) . ')' }}
+                                            @php
+                                                $showXe = abs($xeUsdt) > 0;
+                                            @endphp
+                                            @if($showXe)
+                                                {{ $xeUsdt >= 0 ? number_format($xeUsdt, 2) : '(' . number_format(abs($xeUsdt), 2) . ')' }}
+                                            @endif
                                         </span>
                                         <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][xe_usdt]" class="cf-input" step="0.01" value="{{ $xeUsdt }}"></span>
                                     </td>
                                     @foreach($extraColumns as $col)
-                                        <td class="cf-td cf-td--amount">
-                                            <span class="cf-view-cell">{{ number_format($e->getExtraValueMinor($col->id) / 100, 2) }}</span>
-                                            <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][extra][{{ $col->id }}]" class="cf-input" step="0.01" value="{{ $e->getExtraValueMinor($col->id) / 100 }}"></span>
+                                        @php
+                                            $extraVal = $e->getExtraValueMinor($col->id) / 100;
+                                            $showExtra = abs($extraVal) > 0;
+                                        @endphp
+                                        <td class="cf-td cf-td--amount {{ $extraVal < 0 ? 'cf-td--withdrawal' : '' }}">
+                                            <span class="cf-view-cell">
+                                                @if($showExtra)
+                                                    {{ $extraVal >= 0 ? number_format($extraVal, 2) : '(' . number_format(abs($extraVal), 2) . ')' }}
+                                                @endif
+                                            </span>
+                                            <span class="cf-edit-cell"><input type="number" name="entries[{{ $e->id }}][extra][{{ $col->id }}]" class="cf-input" step="0.01" value="{{ $extraVal }}"></span>
                                         </td>
                                     @endforeach
                                     <td class="cf-td cf-td--left">
@@ -548,13 +574,6 @@
             if (!totalInput) return;
             var hasVal = String(totalInput.value || '').trim() !== '';
             totalInput.dataset.manual = hasVal ? '1' : '0';
-            // When user keys in Total directly, keep Deposit/Withdrawal empty (Total is independent).
-            if (hasVal) {
-                var dep = row.querySelector('.cf-input-deposit');
-                var wd = row.querySelector('.cf-input-withdrawal');
-                if (dep) dep.value = '';
-                if (wd) wd.value = '';
-            }
         }
 
         // Header 拖動：調整整個 column 的顯示順序（僅前端，且只有在 Edit 模式）
