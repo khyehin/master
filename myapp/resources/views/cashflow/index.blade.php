@@ -208,6 +208,11 @@
                                     $bfTotalMinor = $monthlyClosing['total_minor'][$prevMonthKey] ?? null;
                                     $bfAffinMinor = $monthlyClosing['affin_minor'][$prevMonthKey] ?? null;
                                     $bfXeUsdtMinor = $monthlyClosing['xe_usdt_minor'][$prevMonthKey] ?? null;
+                                    $bfExtraMinors = [];
+                                    foreach ($extraColumns as $col) {
+                                        $colId = $col->id;
+                                        $bfExtraMinors[$colId] = $monthlyClosing['extra_minor'][$colId][$prevMonthKey] ?? null;
+                                    }
                                     $bfLabel = $emptyRangeMonthStart->copy()->subMonth()->format('MY');
                                 }
                             @endphp
@@ -226,7 +231,14 @@
                                     <td class="cf-td cf-td--amount {{ ($bfXeUsdtMinor ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
                                         {{ ($bfXeUsdtMinor ?? 0) >= 0 ? number_format(($bfXeUsdtMinor ?? 0) / 100, 2) : '(' . number_format(abs(($bfXeUsdtMinor ?? 0)) / 100, 2) . ')' }}
                                     </td>
-                                    @foreach($extraColumns as $col)<td class="cf-td"></td>@endforeach
+                                    @foreach($extraColumns as $col)
+                                        @php $bfExtra = $bfExtraMinors[$col->id] ?? null; @endphp
+                                        <td class="cf-td cf-td--amount {{ ($bfExtra ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
+                                            @if($bfExtra !== null)
+                                                {{ $bfExtra >= 0 ? number_format($bfExtra / 100, 2) : '(' . number_format(abs($bfExtra) / 100, 2) . ')' }}
+                                            @endif
+                                        </td>
+                                    @endforeach
                                     <td class="cf-td cf-td--left">{{ __('Balance bring forward') }} {{ $bfLabel }}</td>
                                     @if($canDelete ?? false)<td class="cf-td cf-delete-col"></td>@endif
                                 </tr>
@@ -262,7 +274,17 @@
                                         <td class="cf-td cf-td--amount {{ ($bfXeUsdtMinor ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
                                             {{ ($bfXeUsdtMinor ?? 0) >= 0 ? number_format(($bfXeUsdtMinor ?? 0) / 100, 2) : '(' . number_format(abs(($bfXeUsdtMinor ?? 0)) / 100, 2) . ')' }}
                                         </td>
-                                        @foreach($extraColumns as $col)<td class="cf-td"></td>@endforeach
+                                        @foreach($extraColumns as $col)
+                                            @php
+                                                $colId = $col->id;
+                                                $bfExtra = $monthlyClosing['extra_minor'][$colId][$prevMonthKey] ?? null;
+                                            @endphp
+                                            <td class="cf-td cf-td--amount {{ ($bfExtra ?? 0) < 0 ? 'cf-td--withdrawal' : '' }}">
+                                                @if($bfExtra !== null)
+                                                    {{ $bfExtra >= 0 ? number_format($bfExtra / 100, 2) : '(' . number_format(abs($bfExtra) / 100, 2) . ')' }}
+                                                @endif
+                                            </td>
+                                        @endforeach
                                         <td class="cf-td cf-td--left">{{ __('Balance bring forward') }} {{ $bfLabel }}</td>
                                         @if($canDelete ?? false)<td class="cf-td cf-delete-col"></td>@endif
                                     </tr>

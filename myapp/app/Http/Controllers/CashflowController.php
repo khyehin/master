@@ -127,11 +127,13 @@ class CashflowController extends Controller
         $columnOrder = array_merge($columnOrder, $missing);
 
         // Monthly closing balances (up to end of that month) for "balance brought forward"
-        // Track Total (amount_minor), Affin (affin_minor) and Xe+USDT (xe_minor+usdt_minor).
+        // Track Total (amount_minor), Affin (affin_minor), Xe+USDT (xe_minor+usdt_minor) and extra columns.
         $monthlyClosing = [
             'total_minor' => [],
             'affin_minor' => [],
             'xe_usdt_minor' => [],
+            // 'extra_minor' => [column_id => [Y-m => running_sum]]
+            'extra_minor' => [],
         ];
         $raw = $closingBaseQuery->selectRaw('YEAR(entry_date) as y, MONTH(entry_date) as m, SUM(amount_minor) as sum_total_minor, SUM(COALESCE(affin_minor,0)) as sum_affin_minor, SUM(COALESCE(xe_minor,0) + COALESCE(usdt_minor,0)) as sum_xe_usdt_minor')
             ->groupBy('y', 'm')
@@ -149,6 +151,42 @@ class CashflowController extends Controller
             $monthlyClosing['total_minor'][$k] = $runningTotal;
             $monthlyClosing['affin_minor'][$k] = $runningAffin;
             $monthlyClosing['xe_usdt_minor'][$k] = $runningXeUsdt;
+        }
+
+        // Extra columns monthly closing (running sum per column id)
+        if ($extraColumns->isNotEmpty()) {
+            $extraIds = $extraColumns->pluck('id')->all();
+            $extraRaw = \App\Models\CashflowEntryExtraValue::query()
+                ->join('cashflow_entries', 'cashflow_entry_extra_values.cashflow_entry_id', '=', 'cashflow_entries.id')
+                ->whereIn('cashflow_entry_extra_values.cashflow_extra_column_id', $extraIds)
+                ->when(! $dateAll, function ($q) use ($dateFrom, $dateTo) {
+                    if ($dateFrom !== '') {
+                        $q->whereDate('entry_date', '>=', $dateFrom);
+                    }
+                    if ($dateTo !== '') {
+                        $q->whereDate('entry_date', '<=', $dateTo);
+                    }
+                })
+                ->selectRaw('cashflow_entry_extra_values.cashflow_extra_column_id as col_id, YEAR(entry_date) as y, MONTH(entry_date) as m, SUM(value_minor) as sum_extra_minor')
+                ->groupBy('col_id', 'y', 'm')
+                ->orderBy('col_id')
+                ->orderBy('y')
+                ->orderBy('m')
+                ->get();
+
+            $runningExtra = [];
+            foreach ($extraRaw as $r) {
+                $colId = (int) $r->col_id;
+                if (! isset($runningExtra[$colId])) {
+                    $runningExtra[$colId] = 0;
+                }
+                $runningExtra[$colId] += (int) $r->sum_extra_minor;
+                $k = sprintf('%04d-%02d', (int) $r->y, (int) $r->m);
+                if (! isset($monthlyClosing['extra_minor'][$colId])) {
+                    $monthlyClosing['extra_minor'][$colId] = [];
+                }
+                $monthlyClosing['extra_minor'][$colId][$k] = $runningExtra[$colId];
+            }
         }
 
         $companies = Company::query()
