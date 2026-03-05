@@ -81,8 +81,9 @@
                         <tbody id="section-1-body">
                             @foreach($rowsBySection[1] as $i => $row)
                                 @php $rowTotal1 = 0; foreach($monthKeys as $mk) { $rowTotal1 += (float)($row->$mk ?? 0); } @endphp
-                                <tr>
+                                <tr class="report-row-draggable">
                                     <td class="cf-td">
+                                        <span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span>
                                         <span class="row-no">{{ $i + 1 }}</span>
                                         <button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button>
                                     </td>
@@ -142,8 +143,9 @@
                         <tbody id="section-2-body">
                             @foreach($rowsBySection[2] as $i => $row)
                                 @php $rowTotal2 = 0; foreach($monthKeys as $mk) { $rowTotal2 += (float)($row->$mk ?? 0); } @endphp
-                                <tr>
+                                <tr class="report-row-draggable">
                                     <td class="cf-td">
+                                        <span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span>
                                         <span class="row-no">{{ $i + 1 }}</span>
                                         <button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button>
                                     </td>
@@ -212,8 +214,9 @@
                         <tbody id="section-{{ $sec }}-body">
                             @foreach($rowsBySection[$sec] ?? [] as $i => $row)
                                 @php $rowTotalSec = 0; foreach($monthKeys as $mk) { $rowTotalSec += (float)($row->$mk ?? 0); } @endphp
-                                <tr>
+                                <tr class="report-row-draggable">
                                     <td class="cf-td">
+                                        <span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span>
                                         <span class="row-no">{{ $i + 1 }}</span>
                                         <button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button>
                                     </td>
@@ -395,8 +398,8 @@
           border-top:1px solid rgba(156,163,175,.7);
         }
         
-        /* 列宽：table-layout: fixed 下第一行决定列宽 */
-        .report-table thead th:first-child{ width:3rem !important; }
+        /* 列宽：第一列留出拖拽把手 + 序号 + 删除 */
+        .report-table thead th:first-child{ width:4rem !important; }
         .report-table thead th:nth-child(2){ width:140px !important; }
         .report-table thead th:nth-child(n+3){ width:5rem !important; }
         
@@ -524,6 +527,34 @@
           align-items:center;
           justify-content:center;
         }
+        .report-row-draggable{
+          cursor: default; /* 仅在 Edit 模式下通过把手拖动，不整行可拖 */
+        }
+        .report-drag-handle{
+          display: none; /* 默认不显示，把手只在 Edit 模式出现 */
+          cursor: grab;
+          user-select: none;
+          vertical-align: middle;
+          width: 14px;
+          height: 14px;
+          min-width: 14px;
+          min-height: 14px;
+          margin-right: 2px;
+          padding: 0;
+          border: none;
+          background-color: transparent;
+          background-image: linear-gradient(#64748b 1px, transparent 1px), linear-gradient(#64748b 1px, transparent 1px), linear-gradient(#64748b 1px, transparent 1px);
+          background-size: 10px 1px, 10px 1px, 10px 1px;
+          background-position: center 2px, center 50%, center calc(100% - 2px);
+          background-repeat: no-repeat;
+          border-radius: 2px;
+        }
+        .report-drag-handle:active{
+          cursor: grabbing;
+        }
+        body.is-editing .report-drag-handle{
+          display: inline-block;
+        }
         
         /* Save/Cancel 区 */
         .report-actions{
@@ -563,7 +594,8 @@
         function addReportRow(section) {
             var idx = sectionCounts[section];
             var tr = document.createElement('tr');
-            var html = '<td class="cf-td"><span class="row-no">' + (idx + 1) + '</span><button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button></td>' +
+            tr.className = 'report-row-draggable';
+            var html = '<td class="cf-td"><span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span><span class="row-no">' + (idx + 1) + '</span><button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button></td>' +
                 '<td class="cf-td cf-td--left report-desc-cell"><div class="label-view"></div><textarea name="section_' + section + '_rows[' + idx + '][label]" class="report-label label-edit w-full report-field" style="display:none;"></textarea></td>';
             monthKeys.forEach(function(mk) {
                 html += '<td class="cf-td report-amount-cell">' +
@@ -583,8 +615,24 @@
                 var totalRow = document.getElementById('section-' + section + '-total-row');
                 if (totalRow) totalRow.parentNode.insertBefore(tr, totalRow);
             }
-            // new rows start disabled; enabling is controlled by Edit button
-            tr.querySelectorAll('.report-field').forEach(function(i) { i.setAttribute('disabled', 'disabled'); });
+            var isEdit = document.body.classList.contains('is-editing');
+            if (isEdit) {
+                tr.querySelectorAll('.report-field').forEach(function(i) { i.removeAttribute('disabled'); });
+                tr.querySelectorAll('.report-amount-cell').forEach(function(cell) {
+                    var inp = cell.querySelector('input.report-amount');
+                    var view = cell.querySelector('.amount-view');
+                    if (inp) inp.style.display = '';
+                    if (view) view.style.display = 'none';
+                });
+                tr.querySelectorAll('.report-desc-cell').forEach(function(cell) {
+                    var edit = cell.querySelector('.label-edit');
+                    var view = cell.querySelector('.label-view');
+                    if (edit) edit.style.display = '';
+                    if (view) view.style.display = 'none';
+                });
+            } else {
+                tr.querySelectorAll('.report-field').forEach(function(i) { i.setAttribute('disabled', 'disabled'); });
+            }
             sectionCounts[section]++;
             if (section === 1 || section === 2) recalcTotals();
             if (section === 2) tr.querySelectorAll('.section2-amount').forEach(function(inp) { inp.addEventListener('input', recalcTotals); });
@@ -798,6 +846,15 @@
             rows.forEach(function (tr, idx) {
                 var no = tr.querySelector('.row-no');
                 if (no) no.textContent = String(idx + 1);
+                // 重新编号每一行的 name：section_{sec}_rows[idx][field]
+                tr.querySelectorAll('textarea.report-label, input.report-amount').forEach(function (el) {
+                    var name = el.getAttribute('name') || '';
+                    var re = new RegExp('^section_' + section + '_rows\\[(?:\\d+)\\]\\[([^\\]]+)\\]$');
+                    var m = name.match(re);
+                    if (!m) return;
+                    var field = m[1];
+                    el.setAttribute('name', 'section_' + section + '_rows[' + idx + '][' + field + ']');
+                });
             });
             sectionCounts[section] = rows.length;
         }
@@ -835,6 +892,77 @@
                 });
             });
         }
+        // 行拖动：可拖到任意数据行位置，也可拖到 Total 行上方（当最后一行）
+        (function() {
+            var dragRow = null;
+            var dragTbody = null;
+
+            document.addEventListener('dragstart', function (ev) {
+                if (!document.body.classList.contains('is-editing')) return;
+                var handle = ev.target.closest('.report-drag-handle');
+                if (!handle) return;
+                var row = handle.closest('tr.report-row-draggable');
+                if (!row) return;
+                ev.stopPropagation();
+                dragRow = row;
+                dragTbody = row.parentNode;
+                if (ev.dataTransfer) {
+                    ev.dataTransfer.effectAllowed = 'move';
+                    ev.dataTransfer.setData('text/plain', '');
+                }
+            });
+
+            document.addEventListener('dragover', function (ev) {
+                if (!dragRow || !dragTbody) return;
+                var tr = ev.target.closest('tr');
+                if (!tr || tr.parentNode !== dragTbody) return;
+                // 可放在数据行上，或放在 Total/Pending 行上（视为放到最后）
+                if (tr.classList.contains('report-row-draggable') && tr !== dragRow) {
+                    ev.preventDefault();
+                    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+                    return;
+                }
+                if (tr.classList.contains('cf-tfoot')) {
+                    ev.preventDefault();
+                    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+                }
+            });
+
+            document.addEventListener('drop', function (ev) {
+                if (!dragRow || !dragTbody) return;
+                var tr = ev.target.closest('tr');
+                if (!tr || tr.parentNode !== dragTbody) return;
+                ev.preventDefault();
+                var insertBefore = null;
+                if (tr.classList.contains('cf-tfoot')) {
+                    // 放到 Total / Pending 行「下面」：当成最后一条数据行
+                    insertBefore = tr.nextSibling || null; // null = append 到 tbody 末尾
+                } else if (tr.classList.contains('report-row-draggable') && tr !== dragRow) {
+                    var rows = Array.prototype.slice.call(dragTbody.querySelectorAll('tr.report-row-draggable'));
+                    var from = rows.indexOf(dragRow);
+                    var to = rows.indexOf(tr);
+                    if (from === -1 || to === -1) { dragRow = dragTbody = null; return; }
+                    insertBefore = from < to ? tr.nextSibling : tr;
+                }
+                // insertBefore 为 null 表示插到最后
+                if (insertBefore !== undefined) {
+                    dragTbody.insertBefore(dragRow, insertBefore);
+                    var id = dragTbody.getAttribute('id') || '';
+                    var m = id.match(/^section-(\d+)-body$/);
+                    if (m) {
+                        var sec = parseInt(m[1], 10);
+                        renumberSection(sec);
+                        recalcTotals();
+                    }
+                }
+                dragRow = dragTbody = null;
+            });
+
+            document.addEventListener('dragend', function () {
+                dragRow = dragTbody = null;
+            });
+        })();
+
         // Script is at bottom of page; run immediately
         setEditMode(false);
         updateNegativeStyles();
