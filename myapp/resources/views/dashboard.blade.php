@@ -31,11 +31,12 @@
                 <p class="text-gray-500 text-sm">{{ __('No companies assigned.') }}</p>
             </div>
         @else
-            {{-- 資料範圍說明 + 資料摘要（確認有資料時顯示） --}}
+            {{-- 資料範圍說明 + Base currency（跟隨第一個公司）+ 資料摘要 --}}
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-2">
                 <p class="text-sm text-gray-600">
                     {{ __('Cashflow') }}: <a href="{{ route('cashflow.index') }}" class="font-medium text-blue-600 hover:underline">{{ __('View all companies cashflow') }}</a>
                     · {{ $companies->count() }} {{ __('companies') }}
+                    · {{ __('Base currency') }}: <strong>{{ $baseCurrency }}</strong>
                 </p>
                 <p class="text-xs text-gray-500 mt-1" id="dashboard-data-summary">
                     {{ __('Deposit') }}: {{ number_format(($depositTotalMinor ?? 0) / 100, 2) }} {{ $baseCurrency }}
@@ -159,6 +160,12 @@
                     var colValues = colLabels.map(function(k) { return toAmount(columnTotals[k] || 0); });
                     var colCtx = document.getElementById('chartCashflowColumns');
                     if (colCtx) {
+                        var colColors = colorPalette.slice(0, colLabels.length);
+                        if (colColors.length < colLabels.length) {
+                            for (var i = colColors.length; i < colLabels.length; i++) {
+                                colColors.push(colorPalette[i % colorPalette.length]);
+                            }
+                        }
                         new Chart(colCtx, {
                             type: 'bar',
                             data: {
@@ -166,10 +173,10 @@
                                 datasets: [{
                                     label: baseCurrency,
                                     data: colValues,
-                                    backgroundColor: colorPalette.slice(0, 3).map(function(c) {
+                                    backgroundColor: colColors.map(function(c) {
                                         return c.replace('rgb', 'rgba').replace(')', ', 0.7)');
                                     }),
-                                    borderColor: colorPalette.slice(0, 3),
+                                    borderColor: colColors,
                                     borderWidth: 1
                                 }]
                             },
@@ -218,6 +225,7 @@
                                     return {
                                         label: s.name,
                                         data: s.data,
+                                        currency: s.currency || 'USD',
                                         borderColor: colorPalette[i % colorPalette.length],
                                         backgroundColor: part1Gradients[i],
                                         fill: true,
@@ -231,10 +239,23 @@
                                 interaction: { mode: 'index', intersect: false },
                                 plugins: {
                                     legend: { position: 'top' },
-                                    tooltip: { mode: 'index', intersect: false }
+                                    tooltip: {
+                                        mode: 'index',
+                                        intersect: false,
+                                        callbacks: {
+                                            label: function(ctx) {
+                                                var curr = ctx.dataset.currency || 'USD';
+                                                return ctx.dataset.label + ': ' + curr + ' ' + Number(ctx.raw).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                                            }
+                                        }
+                                    }
                                 },
                                 scales: {
-                                    y: { stacked: true, beginAtZero: true, ticks: { callback: function(v) { return v.toLocaleString(); } } },
+                                    y: {
+                                        stacked: true,
+                                        beginAtZero: true,
+                                        ticks: { callback: function(v) { return v.toLocaleString(); } }
+                                    },
                                     x: {
                                         stacked: true,
                                         ticks: { autoSkip: false }
@@ -256,6 +277,7 @@
                                     return {
                                         label: s.name,
                                         data: s.data,
+                                        currency: s.currency || 'USD',
                                         borderColor: colorPalette[i % colorPalette.length],
                                         backgroundColor: colorPalette[i % colorPalette.length].replace('rgb', 'rgba').replace(')', ', 0.1)'),
                                         fill: false,
@@ -269,10 +291,22 @@
                                 interaction: { mode: 'index', intersect: false },
                                 plugins: {
                                     legend: { position: 'top' },
-                                    tooltip: { mode: 'index', intersect: false }
+                                    tooltip: {
+                                        mode: 'index',
+                                        intersect: false,
+                                        callbacks: {
+                                            label: function(ctx) {
+                                                var curr = ctx.dataset.currency || 'USD';
+                                                return ctx.dataset.label + ': ' + curr + ' ' + Number(ctx.raw).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                                            }
+                                        }
+                                    }
                                 },
                                 scales: {
-                                    y: { beginAtZero: true, ticks: { callback: function(v) { return v.toLocaleString(); } } },
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: { callback: function(v) { return v.toLocaleString(); } }
+                                    },
                                     x: { ticks: { autoSkip: false } }
                                 }
                             }

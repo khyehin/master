@@ -204,6 +204,13 @@ class CashflowController extends Controller
             ->orderBy('name')
             ->get();
 
+        $baseCurrency = 'MYR';
+        if ($companyId > 0 && $currentCompany = $companies->firstWhere('id', $companyId)) {
+            $baseCurrency = strtoupper($currentCompany->base_currency ?? 'MYR');
+        } elseif ($companies->isNotEmpty()) {
+            $baseCurrency = strtoupper($companies->first()->base_currency ?? 'MYR');
+        }
+
         return view('cashflow.index', [
             'entries' => $entries,
             'companies' => $companies,
@@ -213,6 +220,7 @@ class CashflowController extends Controller
             'extraColumns' => $extraColumns,
             'filters' => $filters,
             'columnOrder' => $columnOrder,
+            'baseCurrency' => $baseCurrency,
         ]);
     }
 

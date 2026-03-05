@@ -130,6 +130,7 @@
     @php
         $monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         $monthKeys = \App\Models\CompanyReportRow::monthKeys();
+        $currency = strtoupper($company->base_currency ?? 'USD');
         $rowsBySection = $rowsBySection ?? [1 => [], 2 => [], 3 => [], 4 => []];
         $part1Totals = [];
         $part2Pending = [];
@@ -170,7 +171,11 @@
                 <a href="{{ route('companies.index') }}" class="text-sm text-gray-500 hover:text-gray-700 mb-2 inline-block">← {{ __('Companies') }}</a>
                 <div class="text-xs font-semibold uppercase tracking-wider text-gray-500">{{ __('Transactions') }}</div>
                 <h1 class="text-lg font-semibold text-gray-900 mt-1">{{ $company->name }} – {{ __('Total all years') }}</h1>
-                <p class="text-sm text-gray-500 mt-0.5">{{ __('All years summed by row label. Read-only.') }}</p>
+                <p class="text-sm text-gray-500 mt-0.5">
+                    {{ __('Base currency') }}:
+                    <strong>{{ strtoupper($company->base_currency ?? 'USD') }}</strong>.
+                    {{ __('All years summed by row label. Read-only.') }}
+                </p>
             </div>
             <div class="report-actions-top flex flex-wrap gap-2">
                 @foreach($years as $y)
@@ -212,7 +217,7 @@
                                     <td class="cf-td cf-td--left">{{ $row->label }}</td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk ?? null; @endphp
-                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? number_format($v, 2, '.', ',') : '' }}</td>
+                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : '' }}</td>
                                     @endforeach
                                 </tr>
                             @endforeach
@@ -220,7 +225,7 @@
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount">{{ number_format($part1Totals[$idx + 1], 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount">{{ $currency }} {{ number_format($part1Totals[$idx + 1], 2, '.', ',') }}</td>
                                 @endforeach
                             </tr>
                         </tbody>
@@ -252,7 +257,7 @@
                                     <td class="cf-td cf-td--left">{{ $row->label }}</td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk ?? null; @endphp
-                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? number_format($v, 2, '.', ',') : '' }}</td>
+                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : '' }}</td>
                                     @endforeach
                                 </tr>
                             @endforeach
@@ -260,14 +265,14 @@
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Pending Amount') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount">{{ number_format($part2Pending[$idx + 1], 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount">{{ $currency }} {{ number_format($part2Pending[$idx + 1], 2, '.', ',') }}</td>
                                 @endforeach
                             </tr>
                             <tr class="cf-tfoot">
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount">{{ number_format($part2Totals[$idx + 1], 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount">{{ $currency }} {{ number_format($part2Totals[$idx + 1], 2, '.', ',') }}</td>
                                 @endforeach
                             </tr>
                         </tbody>
@@ -299,7 +304,7 @@
                                     <td class="cf-td cf-td--left">{{ $row->label }}</td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk ?? null; @endphp
-                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? number_format($v, 2, '.', ',') : '' }}</td>
+                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : '' }}</td>
                                     @endforeach
                                 </tr>
                             @endforeach
@@ -307,7 +312,7 @@
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount">{{ number_format($part3Totals[$idx + 1], 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount">{{ $currency }} {{ number_format($part3Totals[$idx + 1], 2, '.', ',') }}</td>
                                 @endforeach
                             </tr>
                         </tbody>
@@ -339,7 +344,7 @@
                                     <td class="cf-td cf-td--left">{{ $row->label }}</td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk ?? null; @endphp
-                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? number_format($v, 2, '.', ',') : '' }}</td>
+                                        <td class="cf-td cf-td--amount {{ ($v !== null && (float)$v < 0) ? 'cf-td--withdrawal' : '' }}">{{ $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : '' }}</td>
                                     @endforeach
                                 </tr>
                             @endforeach
@@ -347,7 +352,7 @@
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount">{{ number_format($part4Totals[$idx + 1], 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount">{{ $currency }} {{ number_format($part4Totals[$idx + 1], 2, '.', ',') }}</td>
                                 @endforeach
                             </tr>
                         </tbody>

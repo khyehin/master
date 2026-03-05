@@ -78,11 +78,14 @@ class CompanyReportController extends Controller
         $sectionNumbers = array_values(array_unique(array_merge([1, 2, 3, 4], $sectionsFromRows, $sectionsFromTitles)));
         sort($sectionNumbers);
 
-        // 每一年顯示同一套 row（歷年出現過的所有 label），當年有資料就帶入，沒有就空著；刪除只影響當年，舊年保留
+        // 每一年顯示同一套 row；當年順序與「Total 上/下」依 below_total + row_order 儲存
         $rowsBySection = [];
+        $totalAfterIndex = [];
         $monthKeys = CompanyReportRow::monthKeys();
         foreach ($sectionNumbers as $s) {
-            $rowsBySection[$s] = $this->buildRowsForSection($id, $s, $year, $monthKeys);
+            $result = $this->buildRowsForSection($id, $s, $year, $monthKeys);
+            $rowsBySection[$s] = $result['rows'];
+            $totalAfterIndex[$s] = $result['total_after_index'];
         }
 
         $sectionTitles = CompanyReportSectionTitle::where('company_id', $id)->where('year', $year)->get()->keyBy('section');
@@ -101,6 +104,7 @@ class CompanyReportController extends Controller
             'years' => $years,
             'sectionNumbers' => $sectionNumbers,
             'rowsBySection' => $rowsBySection,
+            'totalAfterIndex' => $totalAfterIndex,
             'sectionTitles' => $sectionTitles,
             'defaultTitles' => $defaultTitles,
             'sectionCounts' => $sectionCounts,
@@ -169,15 +173,18 @@ class CompanyReportController extends Controller
             foreach ($sections as $section) {
                 CompanyReportRow::where('company_id', $id)->where('year', $year)->where('section', $section)->delete();
                 $rows = $request->input("section_{$section}_rows", []);
+                $totalAfter = (int) $request->input("section_{$section}_total_after_index", 0);
                 if (is_array($rows)) {
                     $order = 0;
                     foreach ($rows as $row) {
                         $label = isset($row['label']) ? (string) $row['label'] : '';
+                        $belowTotal = $order >= $totalAfter;
                         $data = [
                             'company_id' => $id,
                             'year' => $year,
                             'section' => $section,
                             'row_order' => $order,
+                            'below_total' => $belowTotal,
                             'label' => $label,
                         ];
                         foreach ($monthKeys as $mk) {
@@ -205,50 +212,49 @@ class CompanyReportController extends Controller
     }
 
     /**
-     * Build report rows for one section: same row labels every year (union of all years),
-     * current year data where it exists, empty otherwise. Deleting in current year does not touch older years.
+     * Build report rows for one section: current year rows in display order (above total, then below total).
+     * Empty rows for labels that exist in other years are appended above total.
+     * Returns [ 'rows' => [...], 'total_after_index' => N ].
      */
     private function buildRowsForSection(int $companyId, int $section, int $year, array $monthKeys): array
     {
+        $yearRows = CompanyReportRow::where('company_id', $companyId)
+            ->where('year', $year)
+            ->where('section', $section)
+            ->orderBy('below_total')
+            ->orderBy('row_order')
+            ->orderBy('id')
+            ->get();
+
+        $above = $yearRows->where('below_total', false)->values();
+        $below = $yearRows->where('below_total', true)->values();
+        $totalAfterIndex = $above->count();
+
+        // Labels from all years (for empty rows in current year)
         $allRows = CompanyReportRow::where('company_id', $companyId)
             ->where('section', $section)
             ->orderBy('year')
             ->orderBy('row_order')
             ->orderBy('id')
             ->get();
-
         $labelOrder = [];
         foreach ($allRows as $r) {
             $label = trim((string) ($r->label ?? ''));
-            if (! in_array($label, $labelOrder, true)) {
+            if ($label !== '' && ! in_array($label, $labelOrder, true)) {
                 $labelOrder[] = $label;
             }
         }
-
-        $yearRows = CompanyReportRow::where('company_id', $companyId)
-            ->where('year', $year)
-            ->where('section', $section)
-            ->orderBy('row_order')
-            ->orderBy('id')
-            ->get();
-
-        $byLabel = [];
-        foreach ($yearRows as $r) {
-            $key = trim((string) ($r->label ?? ''));
-            $byLabel[$key] = $r;
+        $existingLabels = $yearRows->pluck('label')->map(fn ($v) => trim((string) ($v ?? '')))->unique()->filter()->values()->all();
+        $emptyLabels = array_values(array_diff($labelOrder, $existingLabels));
+        $emptyRows = [];
+        foreach ($emptyLabels as $label) {
+            $emptyRows[] = (object) array_merge(['label' => $label], array_fill_keys($monthKeys, null));
         }
+        $totalAfterIndex += count($emptyRows);
 
-        $out = [];
-        foreach ($labelOrder as $label) {
-            if (isset($byLabel[$label])) {
-                $out[] = $byLabel[$label];
-            } else {
-                $empty = (object) array_merge(['label' => $label], array_fill_keys($monthKeys, null));
-                $out[] = $empty;
-            }
-        }
+        $rows = $above->concat($emptyRows)->concat($below)->all();
 
-        return $out;
+        return ['rows' => $rows, 'total_after_index' => $totalAfterIndex];
     }
 
     /** Years that have report rows or cashflow entries for this company */

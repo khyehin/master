@@ -16,7 +16,7 @@
                 <a href="{{ route('companies.index') }}" class="text-sm text-gray-500 hover:text-gray-700 mb-2 inline-block">← {{ __('Companies') }}</a>
                 <div class="text-xs font-semibold uppercase tracking-wider text-gray-500">{{ __('Transactions') }}</div>
                 <h1 class="text-lg font-semibold text-gray-900 mt-1">{{ $company->name }} – {{ __('Monthly report') }}</h1>
-                <p class="text-sm text-gray-500 mt-0.5">{{ __('Year / month. Part 1: expenses. Part 2: Nett (Pending, Total). Part 3: Nett. Part 4: Open capital.') }}</p>
+                <p class="text-sm text-gray-500 mt-0.5">{{ __('Base currency') }}: <strong>{{ strtoupper($company->base_currency ?? 'USD') }}</strong>. {{ __('Year / month. Part 1: expenses. Part 2: Nett (Pending, Total). Part 3: Nett. Part 4: Open capital.') }}</p>
             </div>
             <div class="report-actions-top">
                 <form method="get" action="{{ route('companies.report', $company->id) }}" class="flex items-center gap-2">
@@ -46,6 +46,9 @@
         <form method="post" action="{{ route('companies.report.store', $company->id) }}" class="report-form-width-fix" id="report-form">
             @csrf
             <input type="hidden" name="year" value="{{ $year }}">
+            @php
+                $totalAfterIndex = $totalAfterIndex ?? [];
+            @endphp
 
             @php
                 $monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -53,10 +56,12 @@
                 $sectionNumbers = $sectionNumbers ?? [1,2,3,4];
                 $sectionTitles = $sectionTitles ?? collect();
                 $defaultTitles = $defaultTitles ?? [1=>__('Part 1'),2=>__('Part 2'),3=>__('Part 3'),4=>__('Part 4')];
+                $currency = strtoupper($company->base_currency ?? 'USD');
             @endphp
 
             {{-- Part 1 --}}
             <div class="report-part-wrap" data-section-block="1">
+                <input type="hidden" name="section_1_total_after_index" id="section-1-total-after-index" value="{{ $totalAfterIndex[1] ?? count($rowsBySection[1] ?? []) }}">
                 <div class="content-layer p-4 report-part">
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <h2 class="text-base font-semibold text-gray-900">
@@ -79,7 +84,8 @@
                             </tr>
                         </thead>
                         <tbody id="section-1-body">
-                            @foreach($rowsBySection[1] as $i => $row)
+                            @php $rows1 = $rowsBySection[1] ?? []; $tai1 = $totalAfterIndex[1] ?? count($rows1); @endphp
+                            @foreach(array_slice($rows1, 0, $tai1, true) as $i => $row)
                                 @php $rowTotal1 = 0; foreach($monthKeys as $mk) { $rowTotal1 += (float)($row->$mk ?? 0); } @endphp
                                 <tr class="report-row-draggable">
                                     <td class="cf-td">
@@ -93,23 +99,46 @@
                                     </td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk; @endphp
-                                        @php $display = $v !== null ? number_format($v, 2, '.', ',') : ''; @endphp
+                                        @php $display = $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : ''; @endphp
                                         <td class="cf-td report-amount-cell">
                                             <span class="amount-view {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}">{{ $display }}</span>
                                             <input type="number" step="0.01" name="section_1_rows[{{ $i }}][{{ $mk }}]" value="{{ $v !== null ? $v : '' }}" class="report-input report-amount report-field {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}" disabled style="display:none;">
                                         </td>
                                     @endforeach
-                                    <td class="cf-td cf-td--amount row-total-cell">{{ number_format($rowTotal1, 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount row-total-cell">{{ $currency }} {{ number_format($rowTotal1, 2, '.', ',') }}</td>
                                 </tr>
                             @endforeach
                             <tr class="cf-tfoot" id="section-1-total-row">
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount" data-part1-total-m="{{ $idx + 1 }}">0</td>
+                                    <td class="cf-td cf-td--amount" data-part1-total-m="{{ $idx + 1 }}">{{ $currency }} 0.00</td>
                                 @endforeach
-                                <td class="cf-td cf-td--amount font-semibold" data-part1-total-col>0</td>
+                                <td class="cf-td cf-td--amount font-semibold" data-part1-total-col>{{ $currency }} 0.00</td>
                             </tr>
+                            @foreach(array_slice($rows1, $tai1, null, true) as $i => $row)
+                                @php $rowTotal1 = 0; foreach($monthKeys as $mk) { $rowTotal1 += (float)($row->$mk ?? 0); } @endphp
+                                <tr class="report-row-draggable">
+                                    <td class="cf-td">
+                                        <span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span>
+                                        <span class="row-no">{{ $i + 1 }}</span>
+                                        <button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button>
+                                    </td>
+                                    <td class="cf-td cf-td--left report-desc-cell">
+                                        <div class="label-view">{{ $row->label }}</div>
+                                        <textarea name="section_1_rows[{{ $i }}][label]" class="report-label label-edit w-full report-field" placeholder="{{ __('Description') }}" disabled style="display:none;">{{ $row->label }}</textarea>
+                                    </td>
+                                    @foreach($monthKeys as $mk)
+                                        @php $v = $row->$mk; @endphp
+                                        @php $display = $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : ''; @endphp
+                                        <td class="cf-td report-amount-cell">
+                                            <span class="amount-view {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}">{{ $display }}</span>
+                                            <input type="number" step="0.01" name="section_1_rows[{{ $i }}][{{ $mk }}]" value="{{ $v !== null ? $v : '' }}" class="report-input report-amount report-field {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}" disabled style="display:none;">
+                                        </td>
+                                    @endforeach
+                                    <td class="cf-td cf-td--amount row-total-cell">{{ $currency }} {{ number_format($rowTotal1, 2, '.', ',') }}</td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                     </div>
@@ -119,6 +148,7 @@
 
             {{-- Part 2 --}}
             <div class="report-part-wrap" data-section-block="2">
+                <input type="hidden" name="section_2_total_after_index" id="section-2-total-after-index" value="{{ $totalAfterIndex[2] ?? count($rowsBySection[2] ?? []) }}">
                 <div class="content-layer p-4 report-part">
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <h2 class="text-base font-semibold text-gray-900">
@@ -141,7 +171,8 @@
                             </tr>
                         </thead>
                         <tbody id="section-2-body">
-                            @foreach($rowsBySection[2] as $i => $row)
+                            @php $rows2 = $rowsBySection[2] ?? []; $tai2 = $totalAfterIndex[2] ?? count($rows2); @endphp
+                            @foreach(array_slice($rows2, 0, $tai2, true) as $i => $row)
                                 @php $rowTotal2 = 0; foreach($monthKeys as $mk) { $rowTotal2 += (float)($row->$mk ?? 0); } @endphp
                                 <tr class="report-row-draggable">
                                     <td class="cf-td">
@@ -155,31 +186,54 @@
                                     </td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk; @endphp
-                                        @php $display = $v !== null ? number_format($v, 2, '.', ',') : ''; @endphp
+                                        @php $display = $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : ''; @endphp
                                         <td class="cf-td report-amount-cell">
                                             <span class="amount-view {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}">{{ $display }}</span>
                                             <input type="number" step="0.01" name="section_2_rows[{{ $i }}][{{ $mk }}]" value="{{ $v !== null ? $v : '' }}" class="report-input report-amount section2-amount report-field {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}" disabled style="display:none;">
                                         </td>
                                     @endforeach
-                                    <td class="cf-td cf-td--amount row-total-cell">{{ number_format($rowTotal2, 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount row-total-cell">{{ $currency }} {{ number_format($rowTotal2, 2, '.', ',') }}</td>
                                 </tr>
                             @endforeach
                             <tr class="cf-tfoot" id="section-2-pending-row">
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Pending Amount') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount" data-pending-m="{{ $idx + 1 }}">0</td>
+                                    <td class="cf-td cf-td--amount" data-pending-m="{{ $idx + 1 }}">{{ $currency }} 0.00</td>
                                 @endforeach
-                                <td class="cf-td cf-td--amount font-semibold" data-pending-col>0</td>
+                                <td class="cf-td cf-td--amount font-semibold" data-pending-col>{{ $currency }} 0.00</td>
                             </tr>
                             <tr class="cf-tfoot" id="section-2-total-row">
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount" data-part2-total-m="{{ $idx + 1 }}">0</td>
+                                    <td class="cf-td cf-td--amount" data-part2-total-m="{{ $idx + 1 }}">{{ $currency }} 0.00</td>
                                 @endforeach
-                                <td class="cf-td cf-td--amount font-semibold" data-part2-total-col>0</td>
+                                <td class="cf-td cf-td--amount font-semibold" data-part2-total-col>{{ $currency }} 0.00</td>
                             </tr>
+                            @foreach(array_slice($rows2, $tai2, null, true) as $i => $row)
+                                @php $rowTotal2 = 0; foreach($monthKeys as $mk) { $rowTotal2 += (float)($row->$mk ?? 0); } @endphp
+                                <tr class="report-row-draggable">
+                                    <td class="cf-td">
+                                        <span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span>
+                                        <span class="row-no">{{ $i + 1 }}</span>
+                                        <button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button>
+                                    </td>
+                                    <td class="cf-td cf-td--left report-desc-cell">
+                                        <div class="label-view">{{ $row->label }}</div>
+                                        <textarea name="section_2_rows[{{ $i }}][label]" class="report-label label-edit w-full report-field" disabled style="display:none;">{{ $row->label }}</textarea>
+                                    </td>
+                                    @foreach($monthKeys as $mk)
+                                        @php $v = $row->$mk; @endphp
+                                        @php $display = $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : ''; @endphp
+                                        <td class="cf-td report-amount-cell">
+                                            <span class="amount-view {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}">{{ $display }}</span>
+                                            <input type="number" step="0.01" name="section_2_rows[{{ $i }}][{{ $mk }}]" value="{{ $v !== null ? $v : '' }}" class="report-input report-amount section2-amount report-field {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}" disabled style="display:none;">
+                                        </td>
+                                    @endforeach
+                                    <td class="cf-td cf-td--amount row-total-cell">{{ $currency }} {{ number_format($rowTotal2, 2, '.', ',') }}</td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                     </div>
@@ -189,7 +243,9 @@
 
             {{-- Part 3, 4, 5, ... (loop) --}}
             @foreach(array_filter($sectionNumbers, fn($s) => $s >= 3) as $sec)
+            @php $rowsSec = $rowsBySection[$sec] ?? []; $taiSec = $totalAfterIndex[$sec] ?? count($rowsSec); @endphp
             <div class="report-part-wrap" data-section-block="{{ $sec }}">
+                <input type="hidden" name="section_{{ $sec }}_total_after_index" id="section-{{ $sec }}-total-after-index" value="{{ $taiSec }}">
                 <div class="content-layer p-4 report-part">
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <h2 class="text-base font-semibold text-gray-900">
@@ -212,7 +268,7 @@
                             </tr>
                         </thead>
                         <tbody id="section-{{ $sec }}-body">
-                            @foreach($rowsBySection[$sec] ?? [] as $i => $row)
+                            @foreach(array_slice($rowsSec, 0, $taiSec, true) as $i => $row)
                                 @php $rowTotalSec = 0; foreach($monthKeys as $mk) { $rowTotalSec += (float)($row->$mk ?? 0); } @endphp
                                 <tr class="report-row-draggable">
                                     <td class="cf-td">
@@ -226,23 +282,46 @@
                                     </td>
                                     @foreach($monthKeys as $mk)
                                         @php $v = $row->$mk; @endphp
-                                        @php $display = $v !== null ? number_format($v, 2, '.', ',') : ''; @endphp
+                                        @php $display = $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : ''; @endphp
                                         <td class="cf-td report-amount-cell">
                                             <span class="amount-view {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}">{{ $display }}</span>
                                             <input type="number" step="0.01" name="section_{{ $sec }}_rows[{{ $i }}][{{ $mk }}]" value="{{ $v !== null ? $v : '' }}" class="report-input report-amount report-field {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}" disabled style="display:none;">
                                         </td>
                                     @endforeach
-                                    <td class="cf-td cf-td--amount row-total-cell">{{ number_format($rowTotalSec, 2, '.', ',') }}</td>
+                                    <td class="cf-td cf-td--amount row-total-cell">{{ $currency }} {{ number_format($rowTotalSec, 2, '.', ',') }}</td>
                                 </tr>
                             @endforeach
                             <tr class="cf-tfoot" id="section-{{ $sec }}-total-row">
                                 <td class="cf-td"></td>
                                 <td class="cf-td cf-td--left font-semibold">{{ __('Total') }}</td>
                                 @foreach($monthKeys as $idx => $mk)
-                                    <td class="cf-td cf-td--amount" data-section-total-m="{{ $sec }}-{{ $idx + 1 }}">0</td>
+                                    <td class="cf-td cf-td--amount" data-section-total-m="{{ $sec }}-{{ $idx + 1 }}">{{ $currency }} 0.00</td>
                                 @endforeach
-                                <td class="cf-td cf-td--amount font-semibold" data-section-total-col="{{ $sec }}">0</td>
+                                <td class="cf-td cf-td--amount font-semibold" data-section-total-col="{{ $sec }}">{{ $currency }} 0.00</td>
                             </tr>
+                            @foreach(array_slice($rowsSec, $taiSec, null, true) as $i => $row)
+                                @php $rowTotalSec = 0; foreach($monthKeys as $mk) { $rowTotalSec += (float)($row->$mk ?? 0); } @endphp
+                                <tr class="report-row-draggable">
+                                    <td class="cf-td">
+                                        <span class="report-drag-handle" draggable="true" title="{{ __('Drag to reorder') }}" aria-label="{{ __('Drag to reorder') }}"></span>
+                                        <span class="row-no">{{ $i + 1 }}</span>
+                                        <button type="button" class="row-del" onclick="deleteReportRow(this)" title="{{ __('Delete row') }}">×</button>
+                                    </td>
+                                    <td class="cf-td cf-td--left report-desc-cell">
+                                        <div class="label-view">{{ $row->label }}</div>
+                                        <textarea name="section_{{ $sec }}_rows[{{ $i }}][label]" class="report-label label-edit w-full report-field" disabled style="display:none;">{{ $row->label }}</textarea>
+                                    </td>
+                                    @foreach($monthKeys as $mk)
+                                        @php $v = $row->$mk; @endphp
+                                        @php $display = $v !== null ? $currency . ' ' . number_format($v, 2, '.', ',') : ''; @endphp
+                                        <td class="cf-td report-amount-cell">
+                                            <span class="amount-view {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}">{{ $display }}</span>
+                                            <input type="number" step="0.01" name="section_{{ $sec }}_rows[{{ $i }}][{{ $mk }}]" value="{{ $v !== null ? $v : '' }}" class="report-input report-amount report-field {{ ($v !== null && (float)$v < 0) ? 'neg' : '' }}" disabled style="display:none;">
+                                        </td>
+                                    @endforeach
+                                    <td class="cf-td cf-td--amount row-total-cell">{{ $currency }} {{ number_format($rowTotalSec, 2, '.', ',') }}</td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                     </div>
@@ -579,6 +658,7 @@
         var monthKeys = @json($monthKeys);
         var monthLabels = @json($monthLabels);
         var sectionNumbers = @json($sectionNumbers);
+        var reportCurrency = @json($currency);
         @php $sectionCountsForJs = $sectionCounts ?? [1 => 0, 2 => 0, 3 => 0, 4 => 0]; @endphp
         var sectionCounts = @json($sectionCountsForJs);
 
@@ -589,6 +669,10 @@
             var abs = Math.abs(num);
             var txt = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             return neg ? '-' + txt : txt;
+        }
+        function displayAmount(val) {
+            var s = formatAmount(val);
+            return s === '' ? '' : (reportCurrency + ' ' + s);
         }
 
         function addReportRow(section) {
@@ -603,7 +687,7 @@
                     '<input type="number" step="0.01" name="section_' + section + '_rows[' + idx + '][' + mk + ']" class="report-input report-amount report-field' + (section === 2 ? ' section2-amount' : '') + '" style="display:none;">' +
                     '</td>';
             });
-            html += '<td class="cf-td cf-td--amount row-total-cell">0.00</td>';
+            html += '<td class="cf-td cf-td--amount row-total-cell">' + (reportCurrency + ' 0.00') + '</td>';
             tr.innerHTML = html;
             if (section === 1) {
                 var totalRow = document.getElementById('section-1-total-row');
@@ -645,74 +729,88 @@
             if (!part1Body) return;
 
             for (var m = 1; m <= 12; m++) {
-                // Part 1 totals
+                // Part 1 totals（只算 Total 行上面的数据行）
                 var part1Total = 0;
-                part1Body.querySelectorAll('tr').forEach(function(tr) {
-                    if (tr.classList.contains('cf-tfoot')) return;
-                    var cell = tr.cells[1 + m];
-                    if (!cell) return;
-                    var inp = cell.querySelector('input.report-amount');
-                    if (inp && inp.value !== '') part1Total += parseFloat(inp.value) || 0;
-                });
+                (function() {
+                    var pastTotal = false;
+                    part1Body.querySelectorAll('tr').forEach(function(tr) {
+                        if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
+                        if (pastTotal) return;
+                        var cell = tr.cells[1 + m];
+                        if (!cell) return;
+                        var inp = cell.querySelector('input.report-amount');
+                        if (inp && inp.value !== '') part1Total += parseFloat(inp.value) || 0;
+                    });
+                })();
                 var el = document.querySelector('[data-part1-total-m="' + m + '"]');
                 if (el) {
-                    el.textContent = formatAmount(part1Total);
+                    el.textContent = displayAmount(part1Total);
                     if (part1Total < 0) el.classList.add('neg'); else el.classList.remove('neg');
                 }
 
-                // Part 2 pending + total
+                // Part 2 pending + total（只算 Pending 行上面的数据行）
                 var pending = 0;
                 if (part2Body) {
-                    part2Body.querySelectorAll('tr').forEach(function(tr) {
-                        if (tr.classList.contains('cf-tfoot')) return;
-                        var cell = tr.cells[1 + m];
-                        if (!cell) return;
-                        var inp = cell.querySelector('input.section2-amount');
-                        if (inp && inp.value !== '') pending += parseFloat(inp.value) || 0;
-                    });
+                    (function() {
+                        var pastTotal = false;
+                        part2Body.querySelectorAll('tr').forEach(function(tr) {
+                            if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
+                            if (pastTotal) return;
+                            var cell = tr.cells[1 + m];
+                            if (!cell) return;
+                            var inp = cell.querySelector('input.section2-amount');
+                            if (inp && inp.value !== '') pending += parseFloat(inp.value) || 0;
+                        });
+                    })();
                 }
                 var pendEl = document.querySelector('[data-pending-m="' + m + '"]');
                 if (pendEl) {
-                    pendEl.textContent = formatAmount(pending);
+                    pendEl.textContent = displayAmount(pending);
                     if (pending < 0) pendEl.classList.add('neg'); else pendEl.classList.remove('neg');
                 }
                 var total2 = part1Total + pending;
                 var totEl = document.querySelector('[data-part2-total-m="' + m + '"]');
                 if (totEl) {
-                    totEl.textContent = formatAmount(total2);
+                    totEl.textContent = displayAmount(total2);
                     if (total2 < 0) totEl.classList.add('neg'); else totEl.classList.remove('neg');
                 }
 
-                // Sections 3+ totals
+                // Sections 3+ totals（只算 Total 行上面的数据行）
                 sectionNumbers.forEach(function(sec) {
                     if (sec < 3) return;
                     var body = document.getElementById('section-' + sec + '-body');
                     if (!body) return;
                     var sectTotal = 0;
-                    body.querySelectorAll('tr').forEach(function(tr) {
-                        if (tr.classList.contains('cf-tfoot')) return;
-                        var cell = tr.cells[1 + m];
-                        if (!cell) return;
-                        var inp = cell.querySelector('input.report-amount');
-                        if (inp && inp.value !== '') sectTotal += parseFloat(inp.value) || 0;
-                    });
+                    (function() {
+                        var pastTotal = false;
+                        body.querySelectorAll('tr').forEach(function(tr) {
+                            if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
+                            if (pastTotal) return;
+                            var cell = tr.cells[1 + m];
+                            if (!cell) return;
+                            var inp = cell.querySelector('input.report-amount');
+                            if (inp && inp.value !== '') sectTotal += parseFloat(inp.value) || 0;
+                        });
+                    })();
                     var el = document.querySelector('[data-section-total-m="' + sec + '-' + m + '"]');
                     if (el) {
-                        el.textContent = formatAmount(sectTotal);
+                        el.textContent = displayAmount(sectTotal);
                         if (sectTotal < 0) el.classList.add('neg'); else el.classList.remove('neg');
                     }
                 });
             }
 
-            // Year totals for sections 3+
+            // Year totals for sections 3+（只算 Total 行上面的数据行）
             sectionNumbers.forEach(function(sec) {
                 if (sec < 3) return;
                 var body = document.getElementById('section-' + sec + '-body');
                 if (!body) return;
                 var yearTot = 0;
                 for (var m = 1; m <= 12; m++) {
+                    var pastTotal = false;
                     body.querySelectorAll('tr').forEach(function(tr) {
-                        if (tr.classList.contains('cf-tfoot')) return;
+                        if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
+                        if (pastTotal) return;
                         var cell = tr.cells[1 + m];
                         if (!cell) return;
                         var inp = cell.querySelector('input.report-amount');
@@ -721,22 +819,23 @@
                 }
                 var yearEl = document.querySelector('[data-section-year-total="' + sec + '"]');
                 if (yearEl) {
-                    yearEl.textContent = formatAmount(yearTot);
+                    yearEl.textContent = displayAmount(yearTot);
                     if (yearTot < 0) yearEl.classList.add('neg'); else yearEl.classList.remove('neg');
                 }
                 var colEl = document.querySelector('[data-section-total-col="' + sec + '"]');
                 if (colEl) {
-                    colEl.textContent = formatAmount(yearTot);
+                    colEl.textContent = displayAmount(yearTot);
                     if (yearTot < 0) colEl.classList.add('neg'); else colEl.classList.remove('neg');
                 }
             });
 
-            // Row total cells (sum of 12 months per row) and Total column for Part 1 & 2
+            // Row total cells (sum of 12 months per row) and Total column for Part 1 & 2（Total 只合计其上面的行）
             function updateRowTotals(body, amountSelector) {
                 if (!body) return 0;
                 var sectionYearTotal = 0;
+                var pastTotal = false;
                 body.querySelectorAll('tr').forEach(function(tr) {
-                    if (tr.classList.contains('cf-tfoot')) return;
+                    if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
                     var rowSum = 0;
                     for (var mi = 1; mi <= 12; mi++) {
                         var cell = tr.cells[1 + mi];
@@ -744,10 +843,10 @@
                         var inp = cell.querySelector(amountSelector || 'input.report-amount');
                         if (inp && inp.value !== '') rowSum += parseFloat(inp.value) || 0;
                     }
-                    sectionYearTotal += rowSum;
+                    if (!pastTotal) sectionYearTotal += rowSum;
                     var totalCell = tr.cells[tr.cells.length - 1];
                     if (totalCell && totalCell.classList.contains('row-total-cell')) {
-                        totalCell.textContent = formatAmount(rowSum);
+                        totalCell.textContent = displayAmount(rowSum);
                         if (rowSum < 0) totalCell.classList.add('neg'); else totalCell.classList.remove('neg');
                     }
                 });
@@ -756,19 +855,19 @@
             var part1YearTot = updateRowTotals(part1Body);
             var part1ColEl = document.querySelector('[data-part1-total-col]');
             if (part1ColEl) {
-                part1ColEl.textContent = formatAmount(part1YearTot);
+                part1ColEl.textContent = displayAmount(part1YearTot);
                 if (part1YearTot < 0) part1ColEl.classList.add('neg'); else part1ColEl.classList.remove('neg');
             }
             var part2YearPending = updateRowTotals(part2Body, 'input.section2-amount');
             var pendColEl = document.querySelector('[data-pending-col]');
             if (pendColEl) {
-                pendColEl.textContent = formatAmount(part2YearPending);
+                pendColEl.textContent = displayAmount(part2YearPending);
                 if (part2YearPending < 0) pendColEl.classList.add('neg'); else pendColEl.classList.remove('neg');
             }
             var part2YearTot = part1YearTot + part2YearPending;
             var part2ColEl = document.querySelector('[data-part2-total-col]');
             if (part2ColEl) {
-                part2ColEl.textContent = formatAmount(part2YearTot);
+                part2ColEl.textContent = displayAmount(part2YearTot);
                 if (part2YearTot < 0) part2ColEl.classList.add('neg'); else part2ColEl.classList.remove('neg');
             }
             sectionNumbers.forEach(function(sec) {
@@ -818,7 +917,7 @@
                     view.style.display = '';
                     input.style.display = 'none';
                     var v = input.value === '' ? null : (parseFloat(input.value) || 0);
-                    view.textContent = v === null ? '' : formatAmount(v);
+                    view.textContent = v === null ? '' : displayAmount(v);
                 }
             });
             var btnSave = document.getElementById('btn-save');
@@ -833,7 +932,7 @@
                 if (v !== null && v < 0) inp.classList.add('neg'); else inp.classList.remove('neg');
             });
             document.querySelectorAll('.amount-view').forEach(function (span) {
-                var txt = span.textContent || '';
+                var txt = (span.textContent || '').replace(new RegExp('^' + (reportCurrency || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+'), '');
                 var num = parseFloat(txt.replace(/,/g, ''));
                 if (!isNaN(num) && num < 0) span.classList.add('neg'); else span.classList.remove('neg');
             });
@@ -889,6 +988,18 @@
                 // ensure disabled fields submit
                 document.querySelectorAll('.report-field').forEach(function (el) {
                     el.removeAttribute('disabled');
+                });
+                // 依目前 DOM 更新每個 section 的 total_after_index（Total 上方有幾行）
+                sectionNumbers.forEach(function(sec) {
+                    var tbody = document.getElementById('section-' + sec + '-body');
+                    if (!tbody) return;
+                    var count = 0;
+                    for (var r = tbody.firstElementChild; r; r = r.nextElementSibling) {
+                        if (r.classList.contains('cf-tfoot')) break;
+                        if (r.classList.contains('report-row-draggable')) count++;
+                    }
+                    var inp = document.getElementById('section-' + sec + '-total-after-index');
+                    if (inp) inp.value = count;
                 });
             });
         }

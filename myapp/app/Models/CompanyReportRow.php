@@ -12,12 +12,14 @@ class CompanyReportRow extends Model
         'year',
         'section',
         'row_order',
+        'below_total',
         'label',
         'm1', 'm2', 'm3', 'm4', 'm5', 'm6',
         'm7', 'm8', 'm9', 'm10', 'm11', 'm12',
     ];
 
     protected $casts = [
+        'below_total' => 'boolean',
         'm1' => 'decimal:2',
         'm2' => 'decimal:2',
         'm3' => 'decimal:2',

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\CashflowEntry;
+use App\Models\CashflowEntryExtraValue;
+use App\Models\CashflowExtraColumn;
 use App\Models\Company;
 use App\Models\CompanyReportRow;
 use App\Models\User;
@@ -135,7 +137,7 @@ class DashboardController extends Controller
                 ];
             }
 
-            // Columns 图：显示「目前余额」，不限制时间区间
+            // Columns 图：显示「目前余额」，含 Affin、XE USDT、用户加的 extra columns、Total
             $cols = CashflowEntry::query()
                 ->where(function ($q) use ($companyIds) {
                     $q->whereIn('company_id', $companyIds)->orWhereNull('company_id');
@@ -147,8 +149,21 @@ class DashboardController extends Controller
                     DB::raw('COALESCE(SUM(base_amount_minor), 0) as total_balance')
                 )
                 ->first();
-            $columnTotals['Affin'] = (int) ($cols->affin ?? 0);
-            $columnTotals['XE USDT'] = (int) ($cols->xe ?? 0) + (int) ($cols->usdt ?? 0);
+            $columnTotals = [
+                'Affin' => (int) ($cols->affin ?? 0),
+                'XE USDT' => (int) ($cols->xe ?? 0) + (int) ($cols->usdt ?? 0),
+            ];
+            $extraColumns = CashflowExtraColumn::ordered()->get();
+            foreach ($extraColumns as $ec) {
+                $sum = CashflowEntryExtraValue::query()
+                    ->join('cashflow_entries', 'cashflow_entry_extra_values.cashflow_entry_id', '=', 'cashflow_entries.id')
+                    ->where('cashflow_entry_extra_values.cashflow_extra_column_id', $ec->id)
+                    ->where(function ($q) use ($companyIds) {
+                        $q->whereIn('cashflow_entries.company_id', $companyIds)->orWhereNull('cashflow_entries.company_id');
+                    })
+                    ->sum('cashflow_entry_extra_values.value_minor');
+                $columnTotals[$ec->name] = (int) $sum;
+            }
             $columnTotals['Total'] = (int) ($cols->total_balance ?? 0);
 
             // Pie 图：最近 3 个月的 Deposit vs Withdraw（按时间顺序），用纯数字计算月份避免 Carbon 复制异常
@@ -197,7 +212,10 @@ class DashboardController extends Controller
             ];
         }
 
-        $baseCurrency = $companies->first()?->base_currency ?? 'MYR';
+        // Base currency：跟隨第一個可見公司的 base_currency，無則用 USD（不寫死 MYR）
+        $baseCurrency = $companies->isNotEmpty()
+            ? strtoupper($companies->first()->base_currency ?? 'USD')
+            : 'USD';
 
         // ==== 底部两个图：最新 6 个月（按今天往回算） ====
         $monthKeys = CompanyReportRow::monthKeys();
@@ -262,8 +280,9 @@ class DashboardController extends Controller
                 $part1Data[] = round($p1, 2);
                 $part2Data[] = round($p1 + $p2, 2);
             }
-            $part1Last6Series[] = ['name' => $c->name, 'data' => $part1Data];
-            $part2Series[] = ['name' => $c->name, 'data' => $part2Data];
+            $currency = strtoupper($c->base_currency ?? 'USD');
+            $part1Last6Series[] = ['name' => $c->name, 'data' => $part1Data, 'currency' => $currency];
+            $part2Series[] = ['name' => $c->name, 'data' => $part2Data, 'currency' => $currency];
         }
 
         return view('dashboard', [

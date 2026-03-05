@@ -102,10 +102,10 @@
                 <div class="text-xs font-semibold uppercase tracking-wider text-gray-500">{{ __('Cashflow') }}</div>
                 @if($isSystem)
                     <h1 class="text-lg font-semibold text-gray-900 mt-1">{{ __('Master Cashflow') }}</h1>
-                    <p class="text-sm text-gray-500 mt-0.5">{{ __('Add row or add column below.') }}</p>
+                    <p class="text-sm text-gray-500 mt-0.5">{{ __('Base currency') }}: <strong>{{ $baseCurrency ?? 'MYR' }}</strong>. {{ __('Add row or add column below.') }}</p>
                 @else
                     <h1 class="text-lg font-semibold text-gray-900 mt-1">{{ __('Company Cashflow') }}</h1>
-                    <p class="text-sm text-gray-500 mt-0.5">{{ $currentCompany ? $currentCompany->name : '' }}. {{ __('Add row or add column below.') }}</p>
+                    <p class="text-sm text-gray-500 mt-0.5">{{ $currentCompany ? $currentCompany->name : '' }}. {{ __('Base currency') }}: <strong>{{ $baseCurrency ?? ($currentCompany->base_currency ?? 'MYR') }}</strong>. {{ __('Add row or add column below.') }}</p>
                 @endif
             </div>
             <div class="flex flex-wrap items-center gap-3">
