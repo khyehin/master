@@ -739,7 +739,10 @@
         function recalcTotals() {
             var part1Body = document.getElementById('section-1-body');
             var part2Body = document.getElementById('section-2-body');
+            var part3Body = document.getElementById('section-3-body');
             if (!part1Body) return;
+
+            var part1TotalsByMonth = {};
 
             for (var m = 1; m <= 12; m++) {
                 // Part 1 totals（只算 Total 行上面的数据行）
@@ -755,6 +758,7 @@
                         if (inp && inp.value !== '') part1Total += parseFloat(inp.value) || 0;
                     });
                 })();
+                part1TotalsByMonth[m] = part1Total;
                 var el = document.querySelector('[data-part1-total-m="' + m + '"]');
                 if (el) {
                     el.textContent = displayAmount(part1Total);
@@ -788,23 +792,28 @@
                     if (total2 < 0) totEl.classList.add('neg'); else totEl.classList.remove('neg');
                 }
 
-                // Sections 3+ totals（只算 Total 行上面的数据行）
+                // Sections 3+ totals
                 sectionNumbers.forEach(function(sec) {
                     if (sec < 3) return;
                     var body = document.getElementById('section-' + sec + '-body');
                     if (!body) return;
                     var sectTotal = 0;
-                    (function() {
-                        var pastTotal = false;
-                        body.querySelectorAll('tr').forEach(function(tr) {
-                            if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
-                            if (pastTotal) return;
-                            var cell = tr.cells[1 + m];
-                            if (!cell) return;
-                            var inp = cell.querySelector('input.report-amount');
-                            if (inp && inp.value !== '') sectTotal += parseFloat(inp.value) || 0;
-                        });
-                    })();
+                    if (sec === 3) {
+                        // Part 3 的 Total 跟著 Part 1 的 Total（按月份）
+                        sectTotal = part1Total;
+                    } else {
+                        (function() {
+                            var pastTotal = false;
+                            body.querySelectorAll('tr').forEach(function(tr) {
+                                if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
+                                if (pastTotal) return;
+                                var cell = tr.cells[1 + m];
+                                if (!cell) return;
+                                var inp = cell.querySelector('input.report-amount');
+                                if (inp && inp.value !== '') sectTotal += parseFloat(inp.value) || 0;
+                            });
+                        })();
+                    }
                     var el = document.querySelector('[data-section-total-m="' + sec + '-' + m + '"]');
                     if (el) {
                         el.textContent = displayAmount(sectTotal);
@@ -813,22 +822,51 @@
                 });
             }
 
-            // Year totals for sections 3+（只算 Total 行上面的数据行）
+            // Part 3 row分配：每個月份的 Part 1 Total，平均分配到 Part 3 的每一個 row
+            if (part3Body) {
+                var part3Rows = Array.prototype.slice.call(part3Body.querySelectorAll('tr')).filter(function (tr) {
+                    return !tr.classList.contains('cf-tfoot');
+                });
+                var part3RowCount = part3Rows.length;
+                if (part3RowCount > 0) {
+                    for (var m = 1; m <= 12; m++) {
+                        var totalForMonth = part1TotalsByMonth[m] || 0;
+                        var share = totalForMonth / part3RowCount;
+                        part3Rows.forEach(function (tr) {
+                            var cell = tr.cells[1 + m];
+                            if (!cell) return;
+                            var inp = cell.querySelector('input.report-amount');
+                            var view = cell.querySelector('.amount-view');
+                            if (inp) inp.value = share ? share.toFixed(2) : '';
+                            if (view) view.textContent = share ? displayAmount(share) : '';
+                        });
+                    }
+                }
+            }
+
+            // Year totals for sections 3+
             sectionNumbers.forEach(function(sec) {
                 if (sec < 3) return;
                 var body = document.getElementById('section-' + sec + '-body');
                 if (!body) return;
                 var yearTot = 0;
-                for (var m = 1; m <= 12; m++) {
-                    var pastTotal = false;
-                    body.querySelectorAll('tr').forEach(function(tr) {
-                        if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
-                        if (pastTotal) return;
-                        var cell = tr.cells[1 + m];
-                        if (!cell) return;
-                        var inp = cell.querySelector('input.report-amount');
-                        if (inp && inp.value !== '') yearTot += parseFloat(inp.value) || 0;
-                    });
+                if (sec === 3) {
+                    // Part 3 年度 Total = Part 1 年度 Total
+                    for (var m = 1; m <= 12; m++) {
+                        yearTot += part1TotalsByMonth[m] || 0;
+                    }
+                } else {
+                    for (var m = 1; m <= 12; m++) {
+                        var pastTotal = false;
+                        body.querySelectorAll('tr').forEach(function(tr) {
+                            if (tr.classList.contains('cf-tfoot')) { pastTotal = true; return; }
+                            if (pastTotal) return;
+                            var cell = tr.cells[1 + m];
+                            if (!cell) return;
+                            var inp = cell.querySelector('input.report-amount');
+                            if (inp && inp.value !== '') yearTot += parseFloat(inp.value) || 0;
+                        });
+                    }
                 }
                 var yearEl = document.querySelector('[data-section-year-total="' + sec + '"]');
                 if (yearEl) {
