@@ -42,6 +42,12 @@ class CompanyReportController extends Controller
             return redirect()->route('companies.index')->with('error', __('Company not found.'));
         }
 
+        // 快速切換同一使用者可見的公司
+        $companies = Company::query()
+            ->whereIn('id', $companyIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'base_currency']);
+
         $currentYear = (int) date('Y');
         $year = (int) $request->get('year', $currentYear);
         if ($year < 2000 || $year > 2100) {
@@ -78,10 +84,52 @@ class CompanyReportController extends Controller
         $sectionNumbers = array_values(array_unique(array_merge([1, 2, 3, 4], $sectionsFromRows, $sectionsFromTitles)));
         sort($sectionNumbers);
 
-        // 每一年顯示同一套 row；當年順序與「Total 上/下」依 below_total + row_order 儲存
+        // 如果當前年份某個 section 完全沒有資料，但之前年份有，
+        // 則自動從「最近有資料的年份」複製一份結構（只帶 label / 排序，不帶金額），
+        // 讓新年份一打開就有同一套 row，可以依年份各自編輯 / 刪除。
+        $monthKeys = CompanyReportRow::monthKeys();
+        foreach ($sectionNumbers as $s) {
+            $hasCurrent = CompanyReportRow::where('company_id', $id)
+                ->where('year', $year)
+                ->where('section', $s)
+                ->exists();
+            if ($hasCurrent) {
+                continue;
+            }
+            $prevYear = CompanyReportRow::where('company_id', $id)
+                ->where('section', $s)
+                ->where('year', '<', $year)
+                ->max('year');
+            if (! $prevYear) {
+                continue;
+            }
+            $templateRows = CompanyReportRow::where('company_id', $id)
+                ->where('year', $prevYear)
+                ->where('section', $s)
+                ->orderBy('below_total')
+                ->orderBy('row_order')
+                ->orderBy('id')
+                ->get();
+            $order = 0;
+            foreach ($templateRows as $tr) {
+                $data = [
+                    'company_id' => $id,
+                    'year' => $year,
+                    'section' => $s,
+                    'row_order' => $order++,
+                    'below_total' => $tr->below_total,
+                    'label' => $tr->label,
+                ];
+                foreach ($monthKeys as $mk) {
+                    $data[$mk] = null;
+                }
+                CompanyReportRow::create($data);
+            }
+        }
+
+        // 每一年只顯示自己的 row；當年順序與「Total 上/下」依 below_total + row_order 儲存
         $rowsBySection = [];
         $totalAfterIndex = [];
-        $monthKeys = CompanyReportRow::monthKeys();
         foreach ($sectionNumbers as $s) {
             $result = $this->buildRowsForSection($id, $s, $year, $monthKeys);
             $rowsBySection[$s] = $result['rows'];
@@ -100,6 +148,7 @@ class CompanyReportController extends Controller
 
         return view('companies.report', [
             'company' => $company,
+            'companies' => $companies,
             'year' => $year,
             'years' => $years,
             'sectionNumbers' => $sectionNumbers,
@@ -228,31 +277,9 @@ class CompanyReportController extends Controller
 
         $above = $yearRows->where('below_total', false)->values();
         $below = $yearRows->where('below_total', true)->values();
+        // 每一年只顯示該年的 rows；Total 上面是 below_total = false 的部分
         $totalAfterIndex = $above->count();
-
-        // Labels from all years (for empty rows in current year)
-        $allRows = CompanyReportRow::where('company_id', $companyId)
-            ->where('section', $section)
-            ->orderBy('year')
-            ->orderBy('row_order')
-            ->orderBy('id')
-            ->get();
-        $labelOrder = [];
-        foreach ($allRows as $r) {
-            $label = trim((string) ($r->label ?? ''));
-            if ($label !== '' && ! in_array($label, $labelOrder, true)) {
-                $labelOrder[] = $label;
-            }
-        }
-        $existingLabels = $yearRows->pluck('label')->map(fn ($v) => trim((string) ($v ?? '')))->unique()->filter()->values()->all();
-        $emptyLabels = array_values(array_diff($labelOrder, $existingLabels));
-        $emptyRows = [];
-        foreach ($emptyLabels as $label) {
-            $emptyRows[] = (object) array_merge(['label' => $label], array_fill_keys($monthKeys, null));
-        }
-        $totalAfterIndex += count($emptyRows);
-
-        $rows = $above->concat($emptyRows)->concat($below)->all();
+        $rows = $above->concat($below)->values()->all();
 
         return ['rows' => $rows, 'total_after_index' => $totalAfterIndex];
     }

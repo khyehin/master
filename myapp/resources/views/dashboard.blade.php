@@ -73,20 +73,29 @@
                 </div>
             </div>
 
-            {{-- Companies: Area Chart – Part 1 total last 6 months, all companies --}}
+            {{-- Companies: Area Chart – Total last 6 months, all master companies --}}
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ __('Part 1') }} {{ __('Total') }} ({{ __('Last 6 months') }}) – {{ __('All companies') }}</h2>
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ __('Total') }} ({{ __('Last 6 months') }}) – {{ __('All Master companies') }}</h2>
                 <div class="h-64 md:h-80">
                     <canvas id="chartPart1Area"></canvas>
                 </div>
             </div>
 
-            {{-- Companies: Line Chart – Part 2 total by month, multiple companies --}}
+            {{-- Companies: Line Chart – Part 2 total by month, one chart per company --}}
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
                 <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ __('Part 2') }} {{ __('Total') }} {{ __('by month') }}</h2>
-                <div class="h-64 md:h-80">
-                    <canvas id="chartPart2Line"></canvas>
-                </div>
+                @if(!empty($part2Series))
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        @foreach($part2Series as $idx => $series)
+                            <div class="h-64 md:h-80">
+                                <h3 class="text-sm font-semibold text-gray-700 mb-2">{{ $series['name'] }} – {{ __('Total by month') }}</h3>
+                                <canvas id="chartPart2Line_{{ $idx }}"></canvas>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-sm text-gray-500">{{ __('No data.') }}</p>
+                @endif
             </div>
         @endif
     </div>
@@ -267,14 +276,15 @@
                 } catch (e) { console.error('Dashboard Part1 area chart:', e); }
 
                 try {
-                    var part2Ctx = document.getElementById('chartPart2Line');
-                    if (part2Ctx && part2Series.length) {
-                        new Chart(part2Ctx, {
-                            type: 'line',
-                            data: {
-                                labels: part2Labels,
-                                datasets: part2Series.map(function(s, i) {
-                                    return {
+                    if (Array.isArray(part2Series) && part2Series.length) {
+                        part2Series.forEach(function(s, i) {
+                            var part2Ctx = document.getElementById('chartPart2Line_' + i);
+                            if (!part2Ctx) return;
+                            new Chart(part2Ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: part2Labels,
+                                    datasets: [{
                                         label: s.name,
                                         data: s.data,
                                         currency: s.currency || 'USD',
@@ -282,37 +292,37 @@
                                         backgroundColor: colorPalette[i % colorPalette.length].replace('rgb', 'rgba').replace(')', ', 0.1)'),
                                         fill: false,
                                         tension: 0.3
-                                    };
-                                })
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                interaction: { mode: 'index', intersect: false },
-                                plugins: {
-                                    legend: { position: 'top' },
-                                    tooltip: {
-                                        mode: 'index',
-                                        intersect: false,
-                                        callbacks: {
-                                            label: function(ctx) {
-                                                var curr = ctx.dataset.currency || 'USD';
-                                                return ctx.dataset.label + ': ' + curr + ' ' + Number(ctx.raw).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    interaction: { mode: 'index', intersect: false },
+                                    plugins: {
+                                        legend: { position: 'top' },
+                                        tooltip: {
+                                            mode: 'index',
+                                            intersect: false,
+                                            callbacks: {
+                                                label: function(ctx) {
+                                                    var curr = ctx.dataset.currency || 'USD';
+                                                    return ctx.dataset.label + ': ' + curr + ' ' + Number(ctx.raw).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                                                }
                                             }
                                         }
-                                    }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        ticks: { callback: function(v) { return v.toLocaleString(); } }
                                     },
-                                    x: { ticks: { autoSkip: false } }
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: { callback: function(v) { return v.toLocaleString(); } }
+                                        },
+                                        x: { ticks: { autoSkip: false } }
+                                    }
                                 }
-                            }
+                            });
                         });
                     }
-                } catch (e) { console.error('Dashboard Part2 line chart:', e); }
+                } catch (e) { console.error('Dashboard Part2 line charts (per company):', e); }
             }
 
             var s = document.createElement('script');

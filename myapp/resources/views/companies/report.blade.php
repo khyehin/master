@@ -19,6 +19,19 @@
                 <p class="text-sm text-gray-500 mt-0.5">{{ __('Base currency') }}: <strong>{{ strtoupper($company->base_currency ?? 'USD') }}</strong>. {{ __('Year / month. Part 1: expenses. Part 2: Nett (Pending, Total). Part 3: Nett. Part 4: Open capital.') }}</p>
             </div>
             <div class="report-actions-top">
+                {{-- 快速切換公司 --}}
+                <div class="flex items-center gap-2">
+                    <label for="company-switch" class="text-sm text-gray-600">{{ __('Company') }}</label>
+                    <select id="company-switch" class="report-year-select rounded border border-gray-300 px-3 py-2 text-base font-semibold text-gray-900"
+                            onchange="if (this.value) window.location.href = this.value;">
+                        @foreach($companies ?? [] as $c)
+                            <option value="{{ route('companies.report', ['id' => $c->id, 'year' => $year]) }}" {{ $c->id === $company->id ? 'selected' : '' }}>
+                                {{ $c->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                {{-- 年份切換 --}}
                 <form method="get" action="{{ route('companies.report', $company->id) }}" class="flex items-center gap-2">
                     <label for="year" class="text-sm text-gray-600">{{ __('Year') }}</label>
                     <select id="year" name="year" class="report-year-select rounded border border-gray-300 px-3 py-2 text-base font-semibold text-gray-900" onchange="this.form.submit()">
