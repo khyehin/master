@@ -37,6 +37,7 @@ class User extends Authenticatable
         'pin_hash',
         'pin_attempts',
         'pin_locked_until',
+        'password_changed_at',
         'pin_set_at',
     ];
 
