@@ -267,7 +267,10 @@
                                     },
                                     x: {
                                         stacked: true,
-                                        ticks: { autoSkip: false }
+                                        ticks: {
+                                            autoSkip: false,
+                                            padding: 10 // 讓 Oct 2025 等標籤與下方線有一點距離
+                                        }
                                     }
                                 }
                             }
@@ -312,11 +315,16 @@
                                         }
                                     },
                                     scales: {
-                                        y: {
-                                            beginAtZero: true,
-                                            ticks: { callback: function(v) { return v.toLocaleString(); } }
-                                        },
-                                        x: { ticks: { autoSkip: false } }
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: { callback: function(v) { return v.toLocaleString(); } }
+                                    },
+                                    x: {
+                                        ticks: {
+                                            autoSkip: false,
+                                            padding: 10 // 與底部留一點空隙
+                                        }
+                                    }
                                     }
                                 }
                             });
