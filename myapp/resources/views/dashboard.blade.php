@@ -81,12 +81,12 @@
                 </div>
             </div>
 
-            {{-- Companies: Line Chart – Part 2 total by month, one chart per company --}}
+            {{-- Companies: Line Chart – Total by month, one chart per company (same data as Part 1, split charts) --}}
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ __('Part 2') }} {{ __('Total') }} {{ __('by month') }}</h2>
-                @if(!empty($part2Series))
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ __('Total by month') }}</h2>
+                @if(!empty($part1Last6Series))
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        @foreach($part2Series as $idx => $series)
+                        @foreach($part1Last6Series as $idx => $series)
                             <div class="h-64 md:h-80">
                                 <h3 class="text-sm font-semibold text-gray-700 mb-2">{{ $series['name'] }} – {{ __('Total by month') }}</h3>
                                 <canvas id="chartPart2Line_{{ $idx }}"></canvas>
@@ -276,8 +276,8 @@
                 } catch (e) { console.error('Dashboard Part1 area chart:', e); }
 
                 try {
-                    if (Array.isArray(part2Series) && part2Series.length) {
-                        part2Series.forEach(function(s, i) {
+                    if (Array.isArray(part1Last6Series) && part1Last6Series.length) {
+                        part1Last6Series.forEach(function(s, i) {
                             var part2Ctx = document.getElementById('chartPart2Line_' + i);
                             if (!part2Ctx) return;
                             new Chart(part2Ctx, {
